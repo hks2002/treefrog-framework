@@ -36,7 +36,7 @@
 
 static bool isNumericType(const QString &typeName)
 {
-    switch (QMetaType::type(typeName.toLatin1())) {
+    switch (QMetaType::type(typeName.toLatin1().data())) {
     case QMetaType::Int:
     case QMetaType::UInt:
     case QMetaType::Long:
@@ -53,6 +53,7 @@ static bool isNumericType(const QString &typeName)
     case QMetaType::SChar:
 #endif
         return true;
+
     default:
         return false;
     }
@@ -74,7 +75,9 @@ SqlObjGenerator::~SqlObjGenerator()
 
 QString SqlObjGenerator::generate(const QString &dstDir)
 {
-    QList<QPair<QString, QString>> fieldList = tableSch->getFieldList();
+    QStringList fieldList = tableSch->fieldList();
+    QStringList fieldTypeList = tableSch->fieldTypeList();
+
     if (fieldList.isEmpty()) {
         qCritical("table not found, %s", qPrintable(tableSch->tableName()));
         return QString();
@@ -84,44 +87,49 @@ QString SqlObjGenerator::generate(const QString &dstDir)
 
     // Header part
     output += QString(SQLOBJECT_HEADER_TEMPLATE).arg(modelName.toUpper(), modelName);
-    QListIterator<QPair<QString, QString>> it(fieldList);
-    while (it.hasNext()) {
-        const QPair<QString, QString> &p = it.next();
-        if (isNumericType(p.second)) {
-            output += QString("    %1 %2 {0};\n").arg(p.second, p.first);
-        } else {
-            output += QString("    %1 %2;\n").arg(p.second, p.first);
+
+    for (int i = 0; i < fieldList.length(); ++i) {
+        QString fieldType = fieldTypeList[i];
+
+        if (isNumericType(fieldType)) {
+            output += QString("    %1 %2 {0};\n").arg(fieldType, fieldList[i]);
+        }
+        else {
+            output += QString("    %1 %2;\n").arg(fieldType, fieldList[i]);
         }
     }
 
     // enum part
     output += QLatin1String("\n    enum PropertyIndex {\n");
-    it.toFront();
-    const QPair<QString, QString> &p = it.next();
-    output += QString("        %1 = 0,\n").arg(fieldNameToEnumName(p.first));
-    while (it.hasNext()) {
-        const QPair<QString, QString> &p = it.next();
-        output += QString("        %1,\n").arg(fieldNameToEnumName(p.first));
+    output += QString("        %1 = 0,\n").arg(fieldNameToEnumName(fieldList[0]));
+
+    for (int i = 1; i < fieldList.length(); ++i) {
+        output += QString("        %1,\n").arg(fieldNameToEnumName(fieldList[i]));
     }
+
     output += QLatin1String("    };\n\n");
 
-    // primaryKeyIndex() method
-    output += QLatin1String("    int primaryKeyIndex() const override { return ");
-    QString pkName = tableSch->primaryKeyFieldName();
-    if (pkName.isEmpty()) {
-        output += QLatin1String("-1; }\n");
-    } else {
-        output += fieldNameToEnumName(pkName);
-        output += QLatin1String("; }\n");
+    // primaryKeyIndexList() method
+    output += QLatin1String("    QList<int> primaryKeyIndexList() const override { QList<int> pkidxList; ");
+    QList<int> primaryKeyIndexList = tableSch->primaryKeyIndexList();
+
+    for (auto pkidx : primaryKeyIndexList) {
+        output += QLatin1String("pkidxList<<");
+        output += fieldNameToEnumName(fieldList[pkidx]);
+        output += QLatin1String("; ");
     }
+
+    output += QLatin1String("return pkidxList; }\n");
 
     // auto-value field, for example auto-increment value
     output += QLatin1String("    int autoValueIndex() const override { return ");
-    QString autoValue = tableSch->autoValueFieldName();
-    if (autoValue.isEmpty()) {
+    int autoValue = tableSch->autoValueIndex();
+
+    if (autoValue == -1) {
         output += QLatin1String("-1; }\n");
-    } else {
-        output += fieldNameToEnumName(autoValue);
+    }
+    else {
+        output += fieldNameToEnumName(fieldList[autoValue]);
         output += QLatin1String("; }\n");
     }
 
@@ -132,10 +140,9 @@ QString SqlObjGenerator::generate(const QString &dstDir)
 
     // Property macros part
     output += QLatin1String("private:    /*** Don't modify below this line ***/\n    Q_OBJECT\n");
-    it.toFront();
-    while (it.hasNext()) {
-        const QPair<QString, QString> &p = it.next();
-        output += QString(SQLOBJECT_PROPERTY_TEMPLATE).arg(p.second, p.first);
+
+    for (int i = 0; i < fieldList.length(); ++i) {
+        output += QString(SQLOBJECT_PROPERTY_TEMPLATE).arg(fieldTypeList[i], fieldList[i]);
     }
 
     // Footer part
@@ -149,23 +156,47 @@ QString SqlObjGenerator::generate(const QString &dstDir)
 }
 
 
-QList<QPair<QString, QVariant::Type>> SqlObjGenerator::fieldList() const
+QStringList SqlObjGenerator::fieldList() const
 {
-    return tableSch->getFieldTypeList();
+    return tableSch->fieldList();
 }
 
-
-int SqlObjGenerator::primaryKeyIndex() const
+QStringList SqlObjGenerator::fieldTypeList() const
 {
-    return tableSch->primaryKeyIndex();
+    return tableSch->fieldTypeList();
 }
 
+QList<int> SqlObjGenerator::primaryKeyIndexList() const
+{
+    return tableSch->primaryKeyIndexList();
+}
+
+QStringList SqlObjGenerator::refTableList() const
+{
+    return tableSch->refTableList();
+
+}
+
+QList<QStringList> SqlObjGenerator::refTableFieldList() const
+{
+    return tableSch->refTableFieldList();
+}
+
+QStringList SqlObjGenerator::reffedTableList() const
+{
+    return tableSch->reffedTableList();
+
+}
+
+QList<QStringList> SqlObjGenerator::reffedTableFieldList() const
+{
+    return tableSch->reffedTableFieldList();
+}
 
 int SqlObjGenerator::autoValueIndex() const
 {
     return tableSch->autoValueIndex();
 }
-
 
 int SqlObjGenerator::lockRevisionIndex() const
 {

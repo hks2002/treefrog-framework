@@ -17,7 +17,7 @@
     "<%#include \"%1.h\" %>\n"                                          \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=\"UTF-8\">\n"                                      \
+    "  <meta charset=UTF-8\" />\n"                                      \
     "  <title><%= controller()->name() + \": \" + controller()->activeAction() %></title>\n" \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -35,9 +35,9 @@
     "  <tr>\n"                                                          \
     "%6"                                                                \
     "    <td>\n"                                                        \
-    "      <%== linkTo(\"Show\", urla(\"show\", i.%7())) %>\n"          \
-    "      <%== linkTo(\"Edit\", urla(\"save\", i.%7())) %>\n"          \
-    "      <%== linkTo(\"Remove\", urla(\"remove\", i.%7()), Tf::Post, \"confirm('Are you sure?')\") %>\n" \
+    "      <%== linkTo(\"Show\", urla(\"show\", %7)) %>\n"              \
+    "      <%== linkTo(\"Edit\", urla(\"save\", %7)) %>\n"              \
+    "      <%== linkTo(\"Remove\", urla(\"remove\", %7), Tf::Post, \"confirm('Are you sure?')\") %>\n" \
     "    </td>\n"                                                       \
     "  </tr>\n"                                                         \
     "<% } %>\n"                                                         \
@@ -52,7 +52,7 @@
     "<% tfetch(%2, %3); %>\n"                                           \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=\"UTF-8\">\n"                                      \
+    "  <meta charset=UTF-8\" />\n"                                      \
     "  <title><%= controller()->name() + \": \" + controller()->activeAction() %></title>\n" \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -62,7 +62,7 @@
     "<h1>Showing %4</h1>\n"                                             \
     "%5"                                                                \
     "\n"                                                                \
-    "<%== linkTo(\"Edit\", urla(\"save\", %3.%6())) %> |\n"             \
+    "<%== linkTo(\"Edit\", urla(\"save\", %6)) %> |\n"                  \
     "<%== linkTo(\"Back\", urla(\"index\")) %>\n"                       \
     "\n"                                                                \
     "</body>\n"                                                         \
@@ -75,7 +75,7 @@
     "<% tfetch(QVariantMap, %2); %>\n"                                  \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=\"UTF-8\">\n"                                      \
+    "  <meta charset=UTF-8\" />\n"                                      \
     "  <title><%= controller()->name() + \": \" + controller()->activeAction() %></title>\n" \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -102,7 +102,7 @@
     "<% tfetch(QVariantMap, %2); %>\n"                                  \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=\"UTF-8\">\n"                                      \
+    "  <meta charset=UTF-8\" />\n"                                      \
     "  <title><%= controller()->name() + \": \" + controller()->activeAction() %></title>\n" \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -111,14 +111,14 @@
     "\n"                                                                \
     "<h1>Editing %3</h1>\n"                                             \
     "\n"                                                                \
-    "<%== formTag(urla(\"save\", %2[\"%4\"]), Tf::Post) %>\n"           \
+    "<%== formTag(urla(\"save\", %4), Tf::Post) %>\n"                   \
     "%6"                                                                \
     "  <p>\n"                                                           \
     "    <input type=\"submit\" value=\"Save\" />\n"                    \
     "  </p>\n"                                                          \
     "</form>\n"                                                         \
     "\n"                                                                \
-    "<%== linkTo(\"Show\", urla(\"show\", %2[\"%4\"])) %> |\n"          \
+    "<%== linkTo(\"Show\", urla(\"show\", %4)) %> |\n"                  \
     "<%== linkTo(\"Back\", urla(\"index\")) %>\n"                       \
     "</body>\n"                                                         \
     "</html>\n"
@@ -132,6 +132,12 @@ static const QStringList excludedColumn = {
     "updatedAt",
     "modifiedAt",
     "lockRevision",
+    "created_by",
+    "updated_by",
+    "modified_by",
+    "createdBy",
+    "updatedBy",
+    "modifiedBy",
 };
 
 
@@ -144,8 +150,12 @@ static const QStringList excludedDirName = {
 };
 
 
-ErbGenerator::ErbGenerator(const QString &view, const QList<QPair<QString, QVariant::Type>> &fields, int pkIdx, int autoValIdx)
-    : viewName(view), fieldList(fields), primaryKeyIndex(pkIdx), autoValueIndex(autoValIdx)
+ErbGenerator::ErbGenerator(const ModelGenerator &modelGen)
+    : viewName(modelGen.model()),
+      fieldList(modelGen.fieldList()),
+      fieldTypeList(modelGen.fieldTypeList()),
+      primaryKeyIndexList(modelGen.primaryKeyIndexList()),
+      autoValueIndex(modelGen.autoValueIndex())
 { }
 
 
@@ -155,13 +165,15 @@ bool ErbGenerator::generate(const QString &dstDir) const
 
     // Reserved word check
     if (excludedDirName.contains(dir.dirName())) {
-        qCritical("Reserved word error. Please use another word.  View name: %s", qPrintable(dir.dirName()));
+        qCritical("Reserved word error. Please use another word.  View name: %s",
+                  qPrintable(dir.dirName()));
         return false;
     }
+
     mkpath(dir);
     copy(dataDirPath + ".trim_mode", dir);
 
-    if (primaryKeyIndex < 0) {
+    if (primaryKeyIndexList.isEmpty()) {
         qWarning("Primary key not found. [view name: %s]", qPrintable(viewName));
         return false;
     }
@@ -169,76 +181,92 @@ bool ErbGenerator::generate(const QString &dstDir) const
     FileWriter fw;
     QString output;
     QString caption = enumNameToCaption(viewName);
-    QString varName = enumNameToVariableName(viewName);
-    const QPair<QString, QVariant::Type> &pkFld = fieldList[primaryKeyIndex];
-    QString pkVarName = fieldNameToVariableName(pkFld.first);
+    QString modelName = enumNameToVariableName(viewName);
+
+    QString indexUrl = "QStringList()";
+    QString showUrl  = "QStringList()";
+    QString saveUrl  = "QStringList()";
+
+    for (int pkidx : primaryKeyIndexList) {
+        QString enu = fieldNameToEnumName(fieldList[pkidx]);
+        QString var = fieldNameToVariableName(fieldList[pkidx]);
+        QString type = fieldTypeList[pkidx];
+        QVariant::Type vtype = QVariant::nameToType(type.toLatin1().data());
+
+        if (vtype == QVariant::Int || vtype == QVariant::UInt || vtype == QVariant::ULongLong ||
+            vtype == QVariant::Double) {
+            indexUrl += QString("<<QString::number(i.%1())").arg(var);
+            showUrl  += QString("<<QString::number(%1.%2())").arg(modelName, var);
+        }
+        else if (vtype == QVariant::String) {
+            indexUrl += QString("<<i.%1()").arg(var);
+            showUrl  += QString("<<%1.%2()").arg(modelName, var);
+        }
+        else {}
+
+        saveUrl  += QString("<<%1[\"%2\"].toString()").arg(modelName, var);
+    }
 
     // Generates index.html.erb
     QString th, td, showitems, entryitems, edititems;
+
     for (int i = 0; i < fieldList.count(); ++i) {
-        const QPair<QString, QVariant::Type> &p = fieldList[i];
+        QString icap = fieldNameToCaption(fieldList[i]);
+        QString ienu = fieldNameToEnumName(fieldList[i]);
+        QString ivar = fieldNameToVariableName(fieldList[i]);
 
-        QString icap = fieldNameToCaption(p.first);
-        QString ivar = fieldNameToVariableName(p.first);
-
-        showitems += "<dt>";
-        showitems += icap;
-        showitems += "</dt><dd><%= ";
-        showitems += varName + "." + ivar;
-        showitems += "() %></dd><br />\n";
+        showitems += "<dt>" + icap + "</dt>";
+        showitems += "<dd><%= " + modelName + "." + ivar + "() %></dd><br />\n";
 
         if (!excludedColumn.contains(ivar, Qt::CaseInsensitive)) {
-            th += "    <th>";
-            th += icap;
-            th += "</th>\n";
-
-            td += "    <td><%= i.";
-            td += ivar;
-            td += "() %></td>\n";
+            th += "    <th>" + icap + "</th>\n";
+            td += "    <td><%= i." + ivar + "() %></td>\n";
 
             if (i != autoValueIndex) {  // case of not auto-value field
-                entryitems += "  <p>\n    <label>";
-                entryitems += icap;
-                entryitems += "<br /><input name=\"";
-                entryitems += varName + '[' + ivar + ']';
-                entryitems += "\" value=\"<%= ";
-                entryitems += varName + "[\"" + ivar + "\"]";
-                entryitems += " %>\" /></label>\n  </p>\n";
+                entryitems += "  <p>\n    <label>" + icap + "<br />";
+                entryitems += "<input name=\"" + modelName + '[' + ivar + ']' + "\" ";
+                entryitems += "value=\"<%= " + modelName + "[\"" + ivar + "\"] %>\"";
+                entryitems += " /></label>\n  </p>\n";
             }
-            edititems += "  <p>\n    <label>";
-            edititems += icap;
-            edititems += "<br /><input type=\"text\" name=\"";
-            edititems += varName + '[' + ivar + ']';
-            edititems += "\" value=\"<%= ";
-            edititems += varName + "[\"" + ivar + "\"]";
-            edititems += " %>\"";
-            if (p.first == pkFld.first) {
+
+            edititems += "  <p>\n    <label>" + icap + "<br />";
+            edititems += "<input type=\"text\" name=\"" + modelName + '[' + ivar + ']' + "\" ";
+            edititems += "value=\"<%= " + modelName + "[\"" + ivar + "\"]" + " %>\"";
+
+            if (primaryKeyIndexList.contains(i)) {
                 edititems += " readonly=\"readonly\"";
             }
+
             edititems += " /></label>\n  </p>\n";
         }
     }
 
-    output = QString(INDEX_TEMPLATE).arg(varName.toLower(), caption, th, viewName, varName,td, pkVarName);
+    output = QString(INDEX_TEMPLATE).arg(modelName.toLower(), caption, th, viewName, modelName, td,
+                                         indexUrl);
     fw.setFilePath(dir.filePath("index.erb"));
+
     if (!fw.write(output, false)) {
         return false;
     }
 
-    output = QString(SHOW_TEMPLATE).arg(varName.toLower(), viewName, varName, caption, showitems, pkVarName);
+    output = QString(SHOW_TEMPLATE).arg(modelName.toLower(), viewName, modelName, caption, showitems,
+                                        showUrl);
     fw.setFilePath(dir.filePath("show.erb"));
+
     if (!fw.write(output, false)) {
         return false;
     }
 
-    output = QString(CREATE_TEMPLATE).arg(varName.toLower(), varName, caption, entryitems);
+    output = QString(CREATE_TEMPLATE).arg(modelName.toLower(), modelName, caption, entryitems);
     fw.setFilePath(dir.filePath("create.erb"));
+
     if (!fw.write(output, false)) {
         return false;
     }
 
-    output = QString(SAVE_TEMPLATE).arg(varName.toLower(), varName, caption, pkVarName, edititems);
+    output = QString(SAVE_TEMPLATE).arg(modelName.toLower(), modelName, caption, saveUrl, edititems);
     fw.setFilePath(dir.filePath("save.erb"));
+
     if (!fw.write(output, false)) {
         return false;
     }

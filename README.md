@@ -54,3 +54,41 @@ MongoDB communication
 TreeFrog Framework uses the 10gen-supported C driver to communicate with the
 MongoDB server. The source code of the driver is included in this package.
 See the README also.
+
+Composite primary keys support
+================================
+This TreeFrog Framework support composite primary keys.
+
+Changed files
+-----------------
+src:
+
+	tsqlobject.h
+	tsqlobject.cpp
+
+	tsessionobject.h
+
+	tsqlormapper.h
+
+tools:
+
+	tableschema.h
+	tableschema.cpp
+	
+	abstractobjgenerator.h
+	sqlobjgenerator.h
+	sqlobjgenerator.cpp
+	mongoobjgenerator.h
+	mongoobjgenerator.cpp
+	
+	modelgenerator.h
+	modelgenerator.cpp
+	
+	controllergenerator.h
+	controllergenerator.cpp
+	
+	otamagenerator.h
+	otamagenerator.cpp
+	
+	erbgenerator.h
+	erbgenerator.cpp

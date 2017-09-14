@@ -5,12 +5,12 @@
 #include <QDir>
 #include <QPair>
 #include <QVariant>
-
+#include <modelgenerator.h>
 
 class OtamaGenerator
 {
 public:
-    OtamaGenerator(const QString &view, const QList<QPair<QString, QVariant::Type>> &fields, int pkIdx, int autoValIdx);
+    OtamaGenerator(const ModelGenerator &modelGen);
     bool generate(const QString &dstDir) const;
 
 protected:
@@ -18,8 +18,9 @@ protected:
 
 private:
     QString viewName;
-    QList<QPair<QString, QVariant::Type>> fieldList;
-    int primaryKeyIndex;
+    QStringList fieldList;
+    QStringList fieldTypeList;
+    QList<int> primaryKeyIndexList;
     int autoValueIndex;
 };
 

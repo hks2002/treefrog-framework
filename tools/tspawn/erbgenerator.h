@@ -5,18 +5,19 @@
 #include <QDir>
 #include <QPair>
 #include <QVariant>
-
+#include <modelgenerator.h>
 
 class ErbGenerator
 {
 public:
-    ErbGenerator(const QString &view, const QList<QPair<QString, QVariant::Type>> &fields, int pkIdx, int autoValIdx);
+    ErbGenerator(const ModelGenerator &modelGen);
     bool generate(const QString &dstDir) const;
 
 private:
     QString viewName;
-    QList<QPair<QString, QVariant::Type>> fieldList;
-    int primaryKeyIndex;
+    QStringList fieldList;
+    QStringList fieldTypeList;
+    QList<int> primaryKeyIndexList;
     int autoValueIndex;
 };
 

@@ -10,6 +10,7 @@ src/trash/
 tools/tspawn/defaults/
 src/test/sharedmemorylogstream/log/
 Gemfile.lock
+tfenv.bat
 
 # Linux
 *.o

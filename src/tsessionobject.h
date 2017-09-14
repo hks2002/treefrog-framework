@@ -17,7 +17,7 @@ public:
         UpdatedAt,
     };
 
-    int primaryKeyIndex() const override { return Id; }
+    QList<int> primaryKeyIndexList() const { QList<int> pkidxs{Id}; return pkidxs; }
     int autoValueIndex() const override { return -1; }
     QString tableName() const override { return QLatin1String("session"); }
 

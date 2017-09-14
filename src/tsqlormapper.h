@@ -46,6 +46,7 @@ public:
     T findFirst(const TCriteria &cri = TCriteria());
     T findFirstBy(int column, QVariant value);
     T findByPrimaryKey(QVariant pk);
+    T findByPrimaryKey(QVariantList pkList);
     int find(const TCriteria &cri = TCriteria());
     int findBy(int column, QVariant value);
     int findIn(int column, const QVariantList &values);
@@ -67,7 +68,8 @@ public:
     /*!
       Const iterator
      */
-    class ConstIterator {
+    class ConstIterator
+    {
     public:
         const TSqlORMapper<T> *m {nullptr};
         int it {0};
@@ -136,7 +138,8 @@ inline T TSqlORMapper<T>::findFirst(const TCriteria &cri)
     if (!cri.isEmpty()) {
         TCriteriaConverter<T> conv(cri, database(), "t0");
         setFilter(conv.toString());
-    } else {
+    }
+    else {
         setFilter(QString());
     }
 
@@ -167,13 +170,47 @@ inline T TSqlORMapper<T>::findFirstBy(int column, QVariant value)
 template <class T>
 inline T TSqlORMapper<T>::findByPrimaryKey(QVariant pk)
 {
-    int idx = T().primaryKeyIndex();
-    if (idx < 0) {
+    QList<int> idxs = T().primaryKeyIndexList();
+
+    if (idxs.isEmpty()) {
         tSystemDebug("Primary key not found, table name: %s", qPrintable(T().tableName()));
         return T();
     }
+    else if (idxs.length() > 1) {
+        tSystemDebug("Primary keys not match, table name: %s", qPrintable(T().tableName()));
+        return T();
+    }
+    else {
+        return findFirst(TCriteria(idxs.at(0), pk));
+    }
+}
 
-    return findFirst(TCriteria(idx, pk));
+/*!
+  Returns the ORM object retrieved with the primary keys \a pks from
+  the table.
+*/
+template <class T>
+inline T TSqlORMapper<T>::findByPrimaryKey(QVariantList pkList)
+{
+    QList<int> idxs = T().primaryKeyIndexList();
+
+    if (idxs.isEmpty()) {
+        tSystemDebug("Primary key not found, table name: %s", qPrintable(T().tableName()));
+        return T();
+    }
+    else if (idxs.length() != pkList.length()) {
+        tSystemDebug("Primary keys not match, table name: %s", qPrintable(T().tableName()));
+        return T();
+    }
+    else {
+        TCriteria cri;
+
+        for (int idx : idxs) {
+            cri.add(idxs.at(idx), pkList.at(idx));
+        }
+
+        return findFirst(cri);
+    }
 }
 
 /*!
@@ -188,14 +225,17 @@ inline int TSqlORMapper<T>::find(const TCriteria &cri)
     if (!cri.isEmpty()) {
         TCriteriaConverter<T> conv(cri, database(), "t0");
         setFilter(conv.toString());
-    } else {
+    }
+    else {
         setFilter(QString());
     }
 
     bool ret = select();
+
     while (canFetchMore()) { // For SQLite, not report back the size of a query
         fetchMore();
     }
+
     Tf::writeQueryLog(query().lastQuery(), ret, lastError());
     tSystemDebug("rowCount: %d", rowCount());
     return ret ? rowCount() : -1;
@@ -272,11 +312,14 @@ template <class T>
 inline T TSqlORMapper<T>::value(int i) const
 {
     T rec;
+
     if (i >= 0 && i < rowCount()) {
         rec.setRecord(record(i), QSqlError());
-    } else {
+    }
+    else {
         tSystemDebug("no such record, index: %d  rowCount:%d", i, rowCount());
     }
+
     return rec;
 }
 
@@ -322,9 +365,11 @@ inline void TSqlORMapper<T>::setSortOrder(const QString &column, Tf::SortOrder o
 {
     if (!column.isEmpty()) {
         T obj;
+
         if (obj.propertyNames().contains(column, Qt::CaseInsensitive)) {
             sortColumns << qMakePair(column, order);
-        } else {
+        }
+        else {
             tWarn("Unable to set sort order : '%s' column not found in '%s' table",
                   qPrintable(column), qPrintable(obj.tableName()));
         }
@@ -397,11 +442,13 @@ inline QString TSqlORMapper<T>::selectStatement() const
     bool joinFlag = !joinClauses.isEmpty();
 
     auto rec = record();
+
     for (int i = 0; i < rec.count(); ++i) {
         if (rec.isGenerated(i)) {
             if (joinFlag) {
                 query += QLatin1String("t0.");
             }
+
             query += TSqlQuery::escapeIdentifier(rec.fieldName(i), QSqlDriver::FieldName, database().driver());
             query += QLatin1Char(',');
         }
@@ -409,31 +456,36 @@ inline QString TSqlORMapper<T>::selectStatement() const
 
     if (Q_UNLIKELY(query.isEmpty())) {
         return query;
-    } else {
+    }
+    else {
         query.chop(1);
     }
 
     if (joinFlag) {
         query.prepend(QLatin1String("SELECT DISTINCT "));
-    } else {
+    }
+    else {
         query.prepend(QLatin1String("SELECT "));
     }
+
     query += QLatin1String(" FROM ");
     query += TSqlQuery::escapeIdentifier(tableName(), QSqlDriver::TableName, database().driver());
     query += QLatin1String(" t0");  // alias needed
 
     if (joinFlag) {
-        for (auto &join : (const QStringList&)joinClauses) {
+        for (auto &join : (const QStringList &)joinClauses) {
             query += join;
         }
     }
 
     QString filter = queryFilter;
+
     if (!joinWhereClauses.isEmpty()) {
-        for (auto &wh : (const QStringList&)joinWhereClauses) {
+        for (auto &wh : (const QStringList &)joinWhereClauses) {
             if (!filter.isEmpty()) {
                 filter += QLatin1String(" AND ");
             }
+
             filter += wh;
         }
     }
@@ -443,6 +495,7 @@ inline QString TSqlORMapper<T>::selectStatement() const
     }
 
     QString orderby = orderBy();
+
     if (!orderby.isEmpty()) {
         query.append(orderby);
     }
@@ -450,6 +503,7 @@ inline QString TSqlORMapper<T>::selectStatement() const
     if (queryLimit > 0) {
         query.append(QLatin1String(" LIMIT ")).append(QString::number(queryLimit));
     }
+
     if (queryOffset > 0) {
         query.append(QLatin1String(" OFFSET ")).append(QString::number(queryOffset));
     }
@@ -467,7 +521,8 @@ inline int TSqlORMapper<T>::findCount(const TCriteria &cri)
     if (!cri.isEmpty()) {
         TCriteriaConverter<T> conv(cri, database(), "t0");
         setFilter(conv.toString());
-    } else {
+    }
+    else {
         setFilter(QString());
     }
 
@@ -479,10 +534,12 @@ inline int TSqlORMapper<T>::findCount(const TCriteria &cri)
     int cnt = -1;
     TSqlQuery q(database());
     bool res = q.exec(query);
+
     if (res) {
         q.next();
         cnt = q.value(0).toInt();
     }
+
     return cnt;
 }
 
@@ -521,9 +578,11 @@ int TSqlORMapper<T>::updateAll(const TCriteria &cri, const QMap<int, QVariant> &
     }
 
     T obj;
+
     for (int i = obj.metaObject()->propertyOffset(); i < obj.metaObject()->propertyCount(); ++i) {
         const char *propName = obj.metaObject()->property(i).name();
         QByteArray prop = QByteArray(propName).toLower();
+
         if (prop == UpdatedAt || prop == ModifiedAt) {
             upd += propName;
             upd += '=';
@@ -534,14 +593,16 @@ int TSqlORMapper<T>::updateAll(const TCriteria &cri, const QMap<int, QVariant> &
     }
 
     QMapIterator<int, QVariant> it(values);
+
     for (;;) {
         it.next();
         upd += conv.propertyName(it.key(), db.driver());
         upd += '=';
         upd += TSqlQuery::formatValue(it.value(), conv.variantType(it.key()), db);
 
-        if (!it.hasNext())
+        if (!it.hasNext()) {
             break;
+        }
 
         upd += QLatin1Char(',');
     }
@@ -576,7 +637,7 @@ inline int TSqlORMapper<T>::removeAll(const TCriteria &cri)
 {
     QSqlDatabase db = database();
     QString del = db.driver()->sqlStatement(QSqlDriver::DeleteStatement,
-                                                    T().tableName(), QSqlRecord(), false);
+                                            T().tableName(), QSqlRecord(), false);
     TCriteriaConverter<T> conv(cri, db);
     QString where = conv.toString();
 
@@ -584,6 +645,7 @@ inline int TSqlORMapper<T>::removeAll(const TCriteria &cri)
         tSystemError("Statement Error");
         return -1;
     }
+
     if (!where.isEmpty()) {
         del.append(QLatin1String(" WHERE ")).append(where);
     }
@@ -686,13 +748,16 @@ inline QString TSqlORMapper<T>::orderBy() const
 
     if (!sortColumns.isEmpty()) {
         str += QLatin1String(" ORDER BY ");
+
         for (auto &p : sortColumns) {
             str += QLatin1String("t0.");
             str += TSqlQuery::escapeIdentifier(p.first, QSqlDriver::FieldName, database().driver());
             str += (p.second == Tf::AscendingOrder) ? QLatin1String(" ASC,") : QLatin1String(" DESC,");
         }
+
         str.chop(1);
     }
+
     return str;
 }
 

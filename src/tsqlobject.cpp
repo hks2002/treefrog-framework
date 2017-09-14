@@ -11,13 +11,19 @@
 #include <TSqlObject>
 #include <TSqlQuery>
 #include <TSystemGlobal>
-#include "tsqldatabase.h"
-#include "tsqldriverextension.h"
+#include <TActionContext>
+#include <TActionController>
 
 const QByteArray LockRevision("lock_revision");
 const QByteArray CreatedAt("created_at");
 const QByteArray UpdatedAt("updated_at");
 const QByteArray ModifiedAt("modified_at");
+
+const QByteArray LOGIN_USER_NAME_KEY("_loginUserName");
+const QByteArray CreatedBy("created_by");
+const QByteArray UpdatedBy("updated_by");
+const QByteArray ModifiedBy("modified_by");
+
 
 /*!
   \class TSqlObject
@@ -62,15 +68,17 @@ QString TSqlObject::tableName() const
         if (i > 0 && clsname[i].isUpper()) {
             tblName += '_';
         }
+
         tblName += clsname[i].toLower();
     }
+
     tblName.remove(QRegExp("_object$"));
     return tblName;
 }
 
 /*!
-  \fn virtual int TSqlObject::primaryKeyIndex() const
-  Returns the position of the primary key field on the table.
+  \fn virtual QList<int> TSqlObject::primaryKeyIndexList() const
+  Returns the positions of the primary key fields on the table.
   This is a virtual function.
 */
 
@@ -124,12 +132,26 @@ bool TSqlObject::create()
         const char *propName = metaObject()->property(i).name();
         QByteArray prop = QByteArray(propName).toLower();
 
-        if (prop == CreatedAt || prop == UpdatedAt || prop == ModifiedAt) {
+        if (prop == CreatedBy || prop == UpdatedBy || prop == ModifiedBy) {
+            QString user;
+
+            if (Tf::currentContext()->currentController()->isUserLoggedIn()) {
+                user = Tf::currentContext()->currentController()->session().value(LOGIN_USER_NAME_KEY).toString();
+            }
+            else {
+                user = Tf::currentSqlDatabase(databaseId()).userName();
+            }
+
+            setProperty(propName, user);
+        }
+        else if (prop == CreatedAt || prop == UpdatedAt || prop == ModifiedAt) {
             setProperty(propName, QDateTime::currentDateTime());
-        } else if (prop == LockRevision) {
+        }
+        else if (prop == LockRevision) {
             // Sets the default value of 'revision' property
             setProperty(propName, 1);  // 1 : default value
-        } else {
+        }
+        else {
             // do nothing
         }
     }
@@ -138,13 +160,16 @@ bool TSqlObject::create()
 
     QString autoValName;
     QSqlRecord record = *this;
+
     if (autoValueIndex() >= 0) {
         autoValName = field(autoValueIndex()).name();
         record.remove(autoValueIndex()); // not insert the value of auto-value field
     }
 
     QSqlDatabase &database = Tf::currentSqlDatabase(databaseId());
-    QString ins = database.driver()->sqlStatement(QSqlDriver::InsertStatement, tableName(), record, false);
+    QString ins = database.driver()->sqlStatement(QSqlDriver::InsertStatement, tableName(), record,
+                  false);
+
     if (Q_UNLIKELY(ins.isEmpty())) {
         sqlError = QSqlError(QLatin1String("No fields to insert"),
                              QString(), QSqlError::StatementError);
@@ -155,19 +180,23 @@ bool TSqlObject::create()
     TSqlQuery query(database);
     bool ret = query.exec(ins);
     sqlError = query.lastError();
+
     if (Q_LIKELY(ret)) {
         // Gets the last inserted value of auto-value field
         if (autoValueIndex() >= 0) {
             QVariant lastid = query.lastInsertId();
 
 #if QT_VERSION >= 0x050400
+
             if (!lastid.isValid() && database.driver()->dbmsType() == QSqlDriver::PostgreSQL) {
 #else
+
             if (!lastid.isValid() && database.driverName().toUpper() == QLatin1String("QPSQL")) {
 #endif
                 // For PostgreSQL without OIDS
                 ret = query.exec("SELECT LASTVAL()");
                 sqlError = query.lastError();
+
                 if (Q_LIKELY(ret)) {
                     lastid = query.getNextValue();
                 }
@@ -179,6 +208,7 @@ bool TSqlObject::create()
             }
         }
     }
+
     return ret;
 }
 
@@ -198,18 +228,28 @@ bool TSqlObject::update()
     QString where(" WHERE ");
 
     // Updates the value of 'updated_at' or 'modified_at' property
-    bool updflag = false;
     int revIndex = -1;
 
     for (int i = metaObject()->propertyOffset(); i < metaObject()->propertyCount(); ++i) {
         const char *propName = metaObject()->property(i).name();
         QByteArray prop = QByteArray(propName).toLower();
 
-        if (!updflag && (prop == UpdatedAt || prop == ModifiedAt)) {
+        if (prop == UpdatedAt || prop == ModifiedAt) {
             setProperty(propName, QDateTime::currentDateTime());
-            updflag = true;
+        }
+        else if (prop == UpdatedBy || prop == ModifiedBy) {
+            QString user;
 
-        } else if (revIndex < 0 && prop == LockRevision) {
+            if (Tf::currentContext()->currentController()->isUserLoggedIn()) {
+                user = Tf::currentContext()->currentController()->session().value(LOGIN_USER_NAME_KEY).toString();
+            }
+            else {
+                user = Tf::currentSqlDatabase(databaseId()).userName();
+            }
+
+            setProperty(propName, user);
+        }
+        else if (revIndex < 0 && prop == LockRevision) {
             bool ok;
             int oldRevision = property(propName).toInt(&ok);
 
@@ -226,7 +266,8 @@ bool TSqlObject::update()
             where.append(QLatin1String(propName));
             where.append('=').append(TSqlQuery::formatValue(oldRevision, QVariant::Int, database));
             where.append(" AND ");
-        } else {
+        }
+        else {
             // continue
         }
     }
@@ -235,29 +276,48 @@ bool TSqlObject::update()
     upd.reserve(255);
     upd.append(QLatin1String("UPDATE ")).append(tableName()).append(QLatin1String(" SET "));
 
-    int pkidx = metaObject()->propertyOffset() + primaryKeyIndex();
-    QMetaProperty metaProp = metaObject()->property(pkidx);
-    const char *pkName = metaProp.name();
-    if (primaryKeyIndex() < 0 || !pkName) {
-        QString msg = QString("Primary key not found for table ") + tableName() + QLatin1String(". Create a primary key!");
+    QList<int> pkidxList = primaryKeyIndexList();
+
+    if (pkidxList.isEmpty()) {
+
+        QString msg = QString("Primary key not found for table ") + tableName() +
+                      QLatin1String(". Create a primary key!");
         sqlError = QSqlError(msg, QString(), QSqlError::StatementError);
         tError("%s", qPrintable(msg));
         return false;
     }
 
-    QVariant::Type pkType = metaProp.type();
-    QVariant origpkval = value(pkName);
-    where.append(QLatin1String(pkName));
-    where.append("=").append(TSqlQuery::formatValue(origpkval, pkType, database));
-    // Restore the value of primary key
-    QObject::setProperty(pkName, origpkval);
+    for (int idx : pkidxList) {
+        int pkidx = metaObject()->propertyOffset() + idx;
+        QMetaProperty metaProp = metaObject()->property(pkidx);
+        const char *pkName = metaProp.name();
+
+        if (idx < 0 || !pkName) {
+            QString msg = QString("Primary key not found for table ") + tableName() +
+                          QLatin1String(". Create a primary key!");
+            sqlError = QSqlError(msg, QString(), QSqlError::StatementError);
+            tError("%s", qPrintable(msg));
+            return false;
+        }
+
+        QVariant::Type pkType = metaProp.type();
+        QVariant origpkval = value(pkName);
+        where.append(QLatin1String(pkName));
+        where.append('=').append(TSqlQuery::formatValue(origpkval, pkType, database));
+        where.append(" AND ");
+        // Restore the value of primary key
+        QObject::setProperty(pkName, origpkval);
+    }
+
+    where.chop(5);
 
     for (int i = metaObject()->propertyOffset(); i < metaObject()->propertyCount(); ++i) {
-        metaProp = metaObject()->property(i);
+        QMetaProperty metaProp = metaObject()->property(i);
         const char *propName = metaProp.name();
         QVariant newval = QObject::property(propName);
         QVariant recval = QSqlRecord::value(QLatin1String(propName));
-        if (i != pkidx && recval.isValid() && recval != newval) {
+
+        if (!pkidxList.contains(i) && recval.isValid() && recval != newval) {
             upd.append(QLatin1String(propName));
             upd.append(QLatin1Char('='));
             upd.append(TSqlQuery::formatValue(newval, metaProp.type(), database));
@@ -277,14 +337,17 @@ bool TSqlObject::update()
     TSqlQuery query(database);
     bool ret = query.exec(upd);
     sqlError = query.lastError();
+
     if (ret) {
         // Optimistic lock check
         if (revIndex >= 0 && query.numRowsAffected() != 1) {
-            QString msg = QString("Row was updated or deleted from table ") + tableName() + QLatin1String(" by another transaction");
+            QString msg = QString("Row was updated or deleted from table ") + tableName() +
+                          QLatin1String(" by another transaction");
             sqlError = QSqlError(msg, QString(), QSqlError::UnknownError);
             throw SqlException(msg, __FILE__, __LINE__);
         }
     }
+
     return ret;
 }
 
@@ -295,70 +358,7 @@ bool TSqlObject::update()
 */
 bool TSqlObject::save()
 {
-    auto &sqldb = Tf::currentSqlDatabase(databaseId());
-    auto &db = TSqlDatabase::database(sqldb.connectionName());
-    QString lockrev;
-
-    if (! db.isUpsertSupported() || ! db.isUpsertEnabled()) {
-        return (isNew()) ? create() : update();
-    }
-
-    // Sets the values of 'created_at', 'updated_at' or 'modified_at' properties
-    for (int i = metaObject()->propertyOffset(); i < metaObject()->propertyCount(); ++i) {
-        const char *propName = metaObject()->property(i).name();
-        QByteArray prop = QByteArray(propName).toLower();
-
-        if (prop == CreatedAt || prop == UpdatedAt || prop == ModifiedAt) {
-            setProperty(propName, QDateTime::currentDateTime());
-        } else if (prop == LockRevision) {
-            // Sets the default value of 'revision' property
-            setProperty(propName, 1);  // 1 : default value
-            lockrev = LockRevision;
-        } else {
-            // do nothing
-        }
-    }
-
-    syncToSqlRecord();
-
-    QSqlRecord recordToInsert = *this;
-    QSqlRecord recordToUpdate = *this;
-    QList<int> removeFields;
-    QString autoValName;
-
-    if (autoValueIndex() >= 0 && autoValueIndex() != primaryKeyIndex()) {
-        autoValName = field(autoValueIndex()).name();
-        recordToInsert.remove(autoValueIndex()); // not insert the value of auto-value field
-    }
-
-    int idxtmp;
-    if ((idxtmp = recordToUpdate.indexOf(CreatedAt)) >= 0) {
-        recordToUpdate.remove(idxtmp);
-    }
-    if ((idxtmp = recordToUpdate.indexOf(LockRevision)) >= 0) {
-        recordToUpdate.remove(idxtmp);
-    }
-
-    QString upst = db.driverExtension()->upsertStatement(tableName(), recordToInsert, recordToUpdate, field(primaryKeyIndex()).name(), lockrev);
-    if (upst.isEmpty()) {
-        // In case unable to generate upsert statement
-        return (isNew()) ? create() : update();
-    }
-
-    TSqlQuery query(sqldb);
-    bool ret = query.exec(upst);
-    sqlError = query.lastError();
-    if (ret) {
-        // Gets the last inserted value of auto-value field
-        if (autoValueIndex() >= 0) {
-            QVariant lastid = query.lastInsertId();
-            if (lastid.isValid()) {
-                QObject::setProperty(autoValName.toLatin1().constData(), lastid);
-                QSqlRecord::setValue(autoValueIndex(), lastid);
-            }
-        }
-    }
-    return ret;
+    return (isNew()) ? create() : update();
 }
 
 /*!
@@ -374,7 +374,9 @@ bool TSqlObject::remove()
     }
 
     QSqlDatabase &database = Tf::currentSqlDatabase(databaseId());
-    QString del = database.driver()->sqlStatement(QSqlDriver::DeleteStatement, tableName(), *static_cast<QSqlRecord *>(this), false);
+    QString del = database.driver()->sqlStatement(QSqlDriver::DeleteStatement, tableName(),
+                  *static_cast<QSqlRecord *>(this), false);
+
     if (del.isEmpty()) {
         sqlError = QSqlError(QLatin1String("Unable to delete row"),
                              QString(), QSqlError::StatementError);
@@ -408,32 +410,56 @@ bool TSqlObject::remove()
         }
     }
 
-    auto metaProp = metaObject()->property(metaObject()->propertyOffset() + primaryKeyIndex());
-    const char *pkName = metaProp.name();
-    if (primaryKeyIndex() < 0 || !pkName) {
-        QString msg = QString("Primary key not found for table ") + tableName() + QLatin1String(". Create a primary key!");
+    QList<int> pkidxList = primaryKeyIndexList();
+
+    if (pkidxList.isEmpty()) {
+        QString msg = QString("Primary key not found for table ") + tableName() +
+                      QLatin1String(". Create a primary key!");
         sqlError = QSqlError(msg, QString(), QSqlError::StatementError);
         tError("%s", qPrintable(msg));
         return false;
     }
-    del.append(QLatin1String(pkName));
-    del.append('=').append(TSqlQuery::formatValue(value(pkName), metaProp.type(), database));
+
+    for (int idx : pkidxList) {
+
+        auto metaProp = metaObject()->property(metaObject()->propertyOffset() + idx);
+        const char *pkName = metaProp.name();
+
+        if (idx < 0 || !pkName) {
+            QString msg = QString("Primary key not found for table ") + tableName() +
+                          QLatin1String(". Create a primary key!");
+            sqlError = QSqlError(msg, QString(), QSqlError::StatementError);
+            tError("%s", qPrintable(msg));
+            return false;
+        }
+
+        del.append(QLatin1String(pkName));
+        del.append('=').append(TSqlQuery::formatValue(value(pkName), metaProp.type(), database));
+        del.append(" AND ");
+    }
+
+    del.chop(5);
 
     TSqlQuery query(database);
     bool ret = query.exec(del);
     sqlError = query.lastError();
+
     if (ret) {
         // Optimistic lock check
         if (query.numRowsAffected() != 1) {
             if (revIndex >= 0) {
-                QString msg = QString("Row was updated or deleted from table ") + tableName() + QLatin1String(" by another transaction");
+                QString msg = QString("Row was updated or deleted from table ") + tableName() +
+                              QLatin1String(" by another transaction");
                 sqlError = QSqlError(msg, QString(), QSqlError::UnknownError);
                 throw SqlException(msg, __FILE__, __LINE__);
             }
+
             tWarn("Row was deleted by another transaction, %s", qPrintable(tableName()));
         }
+
         clear();
     }
+
     return ret;
 }
 
@@ -445,6 +471,7 @@ bool TSqlObject::reload()
     if (isEmpty()) {
         return false;
     }
+
     syncToObject();
     return true;
 }
@@ -455,18 +482,21 @@ bool TSqlObject::reload()
  */
 bool TSqlObject::isModified() const
 {
-    if (isNew())
+    if (isNew()) {
         return false;
+    }
 
     for (int i = 0; i < QSqlRecord::count(); ++i) {
         QString name = field(i).name();
         int index = metaObject()->indexOfProperty(name.toLatin1().constData());
+
         if (index >= 0) {
             if (value(name) != property(name.toLatin1().constData())) {
                 return true;
             }
         }
     }
+
     return false;
 }
 
@@ -477,10 +507,12 @@ bool TSqlObject::isModified() const
 void TSqlObject::syncToObject()
 {
     int offset = metaObject()->propertyOffset();
+
     for (int i = 0; i < QSqlRecord::count(); ++i) {
         QString propertyName = field(i).name();
         QByteArray name = propertyName.toLatin1();
         int index = metaObject()->indexOfProperty(name.constData());
+
         if (index >= offset) {
             QObject::setProperty(name.constData(), value(propertyName));
         }
@@ -495,12 +527,15 @@ void TSqlObject::syncToSqlRecord()
 {
     QSqlRecord::operator=(Tf::currentSqlDatabase(databaseId()).record(tableName()));
     const QMetaObject *metaObj = metaObject();
+
     for (int i = metaObj->propertyOffset(); i < metaObj->propertyCount(); ++i) {
         const char *propName = metaObj->property(i).name();
         int idx = indexOf(propName);
+
         if (idx >= 0) {
             QSqlRecord::setValue(idx, QObject::property(propName));
-        } else {
+        }
+        else {
             tWarn("invalid name: %s", propName);
         }
     }
