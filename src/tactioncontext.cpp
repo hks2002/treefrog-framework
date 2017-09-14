@@ -86,7 +86,7 @@ void TActionContext::execute(THttpRequest &request, int sid)
         tSystemDebug("Routing: controller:%s  action:%s", route.controller.data(),
                      route.action.data());
 
-        if (route.isEmpty()) {
+        if (! route.exists) {
             // Default URL routing
 
             if (Q_UNLIKELY(directViewRenderMode())) { // Direct view render mode?
@@ -110,6 +110,7 @@ void TActionContext::execute(THttpRequest &request, int sid)
         currController = ctlrDispatcher.object();
         if (currController) {
             currController->setActionName(route.action);
+            currController->setArguments(route.params);
             currController->setSocketId(sid);
 
             // Session
@@ -288,7 +289,7 @@ void TActionContext::execute(THttpRequest &request, int sid)
                         accessLogger.setResponseBytes( bytes );
                     }
                 } else {
-                    if (route.isEmpty()) {
+                    if (! route.exists) {
                         int bytes = writeResponse(Tf::NotFound, responseHeader);
                         accessLogger.setResponseBytes( bytes );
                     } else {
@@ -364,6 +365,10 @@ qint64 TActionContext::writeResponse(int statusCode, THttpResponseHeader &header
 {
     T_TRACEFUNC("statusCode:%d", statusCode);
     QByteArray body;
+
+    if (statusCode == Tf::NotModified) {
+        return writeResponse(statusCode, header, QByteArray(), nullptr, 0);
+    }
     if (statusCode >= 400) {
         QFile html(Tf::app()->publicPath() + QString::number(statusCode) + ".html");
         if (html.exists() && html.open(QIODevice::ReadOnly)) {
@@ -389,8 +394,9 @@ qint64 TActionContext::writeResponse(int statusCode, THttpResponseHeader &header
     T_TRACEFUNC("statusCode:%d  contentType:%s  length:%s", statusCode, contentType.data(), qPrintable(QString::number(length)));
 
     header.setStatusLine(statusCode, THttpUtility::getResponseReasonPhrase(statusCode));
-    if (!contentType.isEmpty())
+    if (!contentType.isEmpty()) {
         header.setContentType(contentType);
+    }
 
     return writeResponse(header, body, length);
 }
