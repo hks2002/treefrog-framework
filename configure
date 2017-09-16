@@ -76,7 +76,9 @@ if which uname >/dev/null 2>&1; then
   fi
 else
   echo "uname: command not found"
-  exit
+  OPT="-spec linux-g++"
+  OPT="$OPT CONFIG+=x86_64"
+  #exit
 fi
 
 # default values
@@ -135,8 +137,10 @@ while [ -n "`echo $1 | grep '-'`" ]; do
 done
 
 cd "$BASEDIR"
-replace "s|unix:LIBS +=.*$|unix:LIBS += -Wl,-rpath,. -Wl,-rpath,$LIBDIR -L$LIBDIR -ltreefrog|" defaults/appbase.pri
-replace "s|unix:INCLUDEPATH +=.*$|unix:INCLUDEPATH += $INCLUDEDIR|" defaults/appbase.pri
+replace "s|unix:LIBS +=.*$|unix:LIBS += -Wl,-rpath,. -Wl,-rpath,$LIBDIR -L$LIBDIR -ltreefrog
+|" defaults/appbase.pri
+replace "s|unix:INCLUDEPATH +=.*$|unix:INCLUDEPATH += $INCLUDEDIR
+|" defaults/appbase.pri
 
 if [ -n "$ENABLE_DEBUG" ]; then
   OPT="$OPT CONFIG+=debug"
