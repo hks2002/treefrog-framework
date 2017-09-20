@@ -173,6 +173,7 @@
     "\n"                                                 \
     "class TModelObject;\n"                              \
     "class %2Object;\n"                                  \
+    "%7"                                                \
     "\n\n"                                               \
     "class T_MODEL_EXPORT %2 : public TAbstractUser, public TAbstractModel\n" \
     "{\n"                                                \
@@ -183,7 +184,7 @@
     "    ~%2();\n"                                       \
     "\n"                                                 \
     "%3"                                                 \
-    "%9"                                                 \
+    "%10"                                                 \
     "    %2 &operator=(const %2 &other);\n"              \
     "\n"                                                 \
     "    bool create() { return TAbstractModel::create(); }\n" \
@@ -191,12 +192,12 @@
     "    bool save()   { return TAbstractModel::save(); }\n"   \
     "    bool remove() { return TAbstractModel::remove(); }\n" \
     "\n"                                                 \
-    "    static %2 authenticate(const QString &%7, const QString &%8);\n" \
+    "    static %2 authenticate(const QString &%8, const QString &%9);\n" \
     "    static %2 create(%4);\n"                        \
     "    static %2 create(const QVariantMap &values);\n" \
     "    static %2 get(%5);\n"                           \
-    "%6"                                                 \
     "    static int count();\n"                          \
+    "%6"                                                 \
     "    static QList<%2> getAll();\n"                   \
     "\n"                                                 \
     "private:\n"                                         \
@@ -217,6 +218,7 @@
     "#include <TreeFrogModel>\n"                              \
     "#include \"%1.h\"\n"                                     \
     "#include \"%1object.h\"\n"                               \
+    "%12"                                                     \
     "\n"                                                      \
     "%2::%2()\n"                                              \
     "    : TAbstractUser(), TAbstractModel(), d(new %2Object())\n" \
@@ -244,14 +246,14 @@
     "    return *this;\n"                                     \
     "}\n"                                                     \
     "\n"                                                      \
-    "%2 %2::authenticate(const QString &%12, const QString &%13)\n" \
+    "%2 %2::authenticate(const QString &%13, const QString &%14)\n" \
     "{\n"                                                     \
-    "    if (%12.isEmpty() || %13.isEmpty())\n"               \
+    "    if (%13.isEmpty() || %14.isEmpty())\n"               \
     "        return %2();\n"                                  \
     "\n"                                                      \
-    "    %12<%2Object> mapper;\n"                             \
-    "    %2Object obj = mapper.findFirst(TCriteria(%2Object::%14, %12));\n" \
-    "    if (obj.isNull() || obj.%15 != %13) {\n"             \
+    "    %11<%2Object> mapper;\n"                             \
+    "    %2Object obj = mapper.findFirst(TCriteria(%2Object::%15, %13));\n" \
+    "    if (obj.isNull() || obj.%16 != %14) {\n"             \
     "        obj.clear();\n"                                  \
     "    }\n"                                                 \
     "    return %2(obj);\n"                                   \
@@ -289,7 +291,6 @@
     "    return tfGetModelListBy%10Criteria<%2, %2Object>();\n" \
     "}\n"                                                     \
     "\n"                                                      \
-    "%11"                                                     \
     "TModelObject *%2::modelData()\n"                         \
     "{\n"                                                     \
     "    return d.data();\n"                                  \
@@ -338,13 +339,13 @@ ModelGenerator::ModelGenerator(ModelGenerator::ObjectType type, const QString &m
     modelName = (!model.isEmpty()) ? fieldNameToEnumName(model) : fieldNameToEnumName(table);
 
     switch (type) {
-    case Sql:
-        objGen = new SqlObjGenerator(model, table);
-        break;
+        case Sql:
+            objGen = new SqlObjGenerator(model, table);
+            break;
 
-    case Mongo:
-        objGen = new MongoObjGenerator(model);
-        break;
+        case Mongo:
+            objGen = new MongoObjGenerator(model);
+            break;
     }
 }
 
@@ -372,16 +373,13 @@ bool ModelGenerator::generate(const QString &dstDir, bool userModel)
     if (userModel) {
         if (userFields.count() == 2) {
             files << genUserModel(dstDir, userFields.value(0), userFields.value(1));
-        }
-        else if (userFields.isEmpty()) {
+        } else if (userFields.isEmpty()) {
             files << genUserModel(dstDir);
-        }
-        else {
+        } else {
             qCritical("invalid parameters");
             return false;
         }
-    }
-    else {
+    } else {
         files << genModel(dstDir);
     }
 
@@ -497,16 +495,16 @@ QPair<QStringList, QStringList> ModelGenerator::createModelParams()
 
         // Initial value in the default constructor
         switch (QVariant::nameToType(type.toLatin1().data())) {
-        case QVariant::Int:
-        case QVariant::UInt:
-        case QVariant::LongLong:
-        case QVariant::ULongLong:
-        case QVariant::Double:
-            initParams += QString("\n    d->") + field + " = 0;";
-            break;
+            case QVariant::Int:
+            case QVariant::UInt:
+            case QVariant::LongLong:
+            case QVariant::ULongLong:
+            case QVariant::Double:
+                initParams += QString("\n    d->") + field + " = 0;";
+                break;
 
-        default:
-            ;
+            default:
+                ;
         }
 
         if (var == LOCK_REVISION_FIELD) {
@@ -527,8 +525,7 @@ QPair<QStringList, QStringList> ModelGenerator::createModelParams()
 
     if (primaryKeyIndexList.isEmpty()) {
         getparams = crtparams;
-    }
-    else {
+    } else {
         for (int pkidx : primaryKeyIndexList) {
             getparams += createParam(fieldTypeList[pkidx], fieldList[pkidx]);
             getparams += ", ";
@@ -568,8 +565,7 @@ QPair<QStringList, QStringList> ModelGenerator::createModelParams()
 
         if (includeTableList.contains(enu)) {
             continue;
-        }
-        else {
+        } else {
             includeTable += QString("#include \"%1.h\"\n").arg(enu.toLower());
             classTable += QString("class %1;\n").arg(enu);
 
@@ -628,14 +624,12 @@ QPair<QStringList, QStringList> ModelGenerator::createModelParams()
 
     if (primaryKeyIndexList.isEmpty()) {
         getImpl += "findFirst(cri));\n";
-    }
-    else {
+    } else {
         getImpl += (objectType == Sql) ? "findByPrimaryKey(" : "findByObjectId(";
 
         if (primaryKeyIndexList.length() == 1) {
             getImpl += fieldNameToVariableName(fieldList.at(primaryKeyIndexList.at(0)));
-        }
-        else {
+        } else {
             getImpl += "QVariantList()";
 
             for (int pkidx : primaryKeyIndexList) {
@@ -678,12 +672,11 @@ QString ModelGenerator::createParam(const QString &type, const QString &name)
     QVariant::Type vtype = QVariant::nameToType(type.toLatin1().data());
 
     if (vtype == QVariant::Int || vtype == QVariant::UInt || vtype == QVariant::ULongLong ||
-        vtype == QVariant::Double) {
+            vtype == QVariant::Double) {
         string += type;
         string += ' ';
         string += var;
-    }
-    else {
+    } else {
         string += QString("const %1 &%2").arg(type, var);
     }
 
