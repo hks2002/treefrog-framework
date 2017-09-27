@@ -13,13 +13,12 @@ template <class T, class S>
 inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, const QList<QPair<QString, Tf::SortOrder>> &sortColumns, int limit = 0, int offset = 0)
 {
     TSqlORMapper<S> mapper;
-    if (! sortColumns.isEmpty()) {
-        for (auto &p : sortColumns) {
-            if (!p.first.isEmpty()) {
-                mapper.setSortOrder(p.first, p.second);
-            }
-        }
+    for (auto &p : sortColumns) {
+		if (!p.first.isEmpty()) {
+			mapper.setSortOrder(p.first, p.second);
+		}
     }
+
     if (limit > 0) {
         mapper.setLimit(limit);
     }
@@ -38,16 +37,25 @@ inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, const QList<QPair
 template <class T, class S>
 inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, const QList<QPair<int, Tf::SortOrder>> &sortColumns, int limit = 0, int offset = 0)
 {
-    QList<QPair<QString, Tf::SortOrder>> sorts;
-    QSqlDriver *driver = Tf::currentSqlDatabase(S().databaseId()).driver();
+   TSqlORMapper<S> mapper;
+    for (auto &p : sortColumns){
+		 if (p.first >= 0)
+        mapper.setSortOrder(p.first, p.second);
+	}   
 
-    for (auto &p : sortColumns) {
-        QString columnName = TCriteriaConverter<S>::getPropertyName(p.first, driver);
-        if (! columnName.isEmpty()) {
-            sorts << qMakePair(columnName, p.second);
+    if (limit > 0)
+        mapper.setLimit(limit);
+
+    if (offset > 0)
+        mapper.setOffset(offset);
+
+    QList<T> list;
+    if (mapper.find(cri) > 0) {
+        for (TSqlORMapperIterator<S> i(mapper); i.hasNext(); ) {
+            list << T(i.next());
         }
     }
-    return tfGetModelListByCriteria<T, S>(cri, sorts, limit, offset);
+    return list;
 }
 
 template <class T, class S>
@@ -67,7 +75,7 @@ inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, QString sortColum
 template <class T, class S>
 inline QList<T> tfGetModelListByCriteria(const TCriteria &cri = TCriteria(), int limit = 0, int offset = 0)
 {
-    QList<QPair<int, Tf::SortOrder>> sortColumns = { qMakePair(-1, Tf::AscendingOrder) };
+    QList<QPair<int, Tf::SortOrder>> sortColumns;
     return tfGetModelListByCriteria<T, S>(cri, sortColumns, limit, offset);
 }
 
