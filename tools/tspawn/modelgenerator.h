@@ -12,6 +12,8 @@ class AbstractObjGenerator;
 class ModelGenerator
 {
 public:
+    typedef QList<QPair<QString, QVariant::Type>>  FieldList;
+    typedef QList<QPair<QString, QString>>  PlaceholderList;
 
     enum ObjectType {
         Sql,
@@ -32,14 +34,15 @@ public:
     int autoValueIndex() const;
     int lockRevisionIndex() const;
     QString model() const { return modelName; }
+    static QString replaceholder(const QString &format, const QPair<QString, QString> &value);
+    static QString replaceholder(const QString &format, const PlaceholderList &values);
 
 protected:
     QStringList genModel(const QString &dstDir);
-    QStringList genUserModel(const QString &dstDir, const QString &usernameField = "username",
-                             const QString &passwordField = "password");
-    QPair<QStringList, QStringList> createModelParams();
+    QStringList genUserModel(const QString &dstDir, const QString &usernameField = "username", const QString &passwordField = "password");
+    QPair<PlaceholderList, PlaceholderList> createModelParams();
 
-    static bool gen(const QString &fileName, const QString &format, const QStringList &args);
+    static void gen(const QString &fileName, const QString &format, const QList<QPair<QString, QString>> &values);
     static QString createParam(const QString &type, const QString &name);
 
 private:

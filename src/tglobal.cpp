@@ -232,10 +232,10 @@ QSqlDatabase &Tf::currentSqlDatabase(int id)
 }
 
 
-QMap<QByteArray, const QMetaObject*> *Tf::metaObjects()
+QMap<QByteArray, std::function<QObject*()>> *Tf::objectFactories()
 {
-    static QMap<QByteArray, const QMetaObject*> metaObjectMap;
-    return &metaObjectMap;
+    static QMap<QByteArray, std::function<QObject*()>> objectFactoryMap;
+    return &objectFactoryMap;
 }
 
 /*!

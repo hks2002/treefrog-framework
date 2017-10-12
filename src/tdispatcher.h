@@ -168,9 +168,9 @@ inline T *TDispatcher<T>::object()
     T_TRACEFUNC("");
 
     if (!ptr) {
-        const QMetaObject *meta = Tf::metaObjects()->value(metaType.toLatin1().toLower());
-        if (Q_LIKELY(meta)) {
-            ptr = dynamic_cast<T*>(meta->newInstance());
+        auto factory = Tf::objectFactories()->value(metaType.toLatin1().toLower());
+        if (Q_LIKELY(factory)) {
+            ptr = dynamic_cast<T*>(factory());
             if (ptr) {
                 typeId = 0;
             }

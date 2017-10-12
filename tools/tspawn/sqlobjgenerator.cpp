@@ -110,16 +110,15 @@ QString SqlObjGenerator::generate(const QString &dstDir)
     output += QLatin1String("    };\n\n");
 
     // primaryKeyIndexList() method
-    output += QLatin1String("    QList<int> primaryKeyIndexList() const override { QList<int> pkidxList; ");
+    output += QLatin1String("    QList<int> primaryKeyIndexList() const override { QList<int> pkidxList; return pkidxList");
     QList<int> primaryKeyIndexList = tableSch->primaryKeyIndexList();
 
     for (auto pkidx : primaryKeyIndexList) {
-        output += QLatin1String("pkidxList<<");
+        output += QLatin1String("<<");
         output += fieldNameToEnumName(fieldList[pkidx]);
-        output += QLatin1String("; ");
     }
 
-    output += QLatin1String("return pkidxList; }\n");
+    output += QLatin1String("; }\n");
 
     // auto-value field, for example auto-increment value
     output += QLatin1String("    int autoValueIndex() const override { return ");
@@ -133,6 +132,19 @@ QString SqlObjGenerator::generate(const QString &dstDir)
         output += QLatin1String("; }\n");
     }
 
+	// foreignKeyFieldList() method
+    output += QLatin1String("    QList<int> foreignKeyIndexList() const { QList<int> fkIdxList;return fkIdxList");
+    QList<QStringList> foreignKeyFieldList = tableSch->refTableFieldList();
+
+	for (auto &fkFieldGroup : foreignKeyFieldList){
+		 for (auto &fkField : fkFieldGroup) {
+			output += QLatin1String("<<");
+			output += fieldNameToEnumName(fkField);
+       }
+	}
+
+    output += QLatin1String("; }\n");
+	
     // tableName() method
     output += QLatin1String("    QString tableName() const override { return QLatin1String(\"");
     output += tableSch->tableName();

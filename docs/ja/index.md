@@ -3,62 +3,29 @@ title: ホーム
 page_id: "home.00"
 ---
 
-## 小さくて パワフル そして 高性能
+## <i class="fa fa-bolt" aria-hidden="true"></i> 小さくても パワフル そして 高性能
 
-TreeFrog Framework は、C++によるフルスタックの高速Webアプリケーションフレームワーク
-であり、HTTP はもちろん WebSocket プロトコルもサポートしています。
+TreeFrog Framework は、C++によるフルスタックの高速Webアプリケーションフレームワークであり、HTTP はもちろん WebSocket プロトコルもサポートしています。
 
-C++/Qt で作られたサーバサイドのフレームワークであるので、スクリプト言語のものより高速に
-動作することが可能です。アプリケーション開発では、MVC アーキテクチャのもと O/R マッパー
-やテンプレートの仕組みを提供し、「設定より規約」のポリシーでプログラミング言語 C++でも
-高い生産性の実現を目指しています。
-
-## お知らせ
-
-### 2017/7/1  TreeFrog Framework バージョン1.18.0 （安定版）リリース <span style="color: red;">New!</span>
-
- - MongoDBへのセッションストアを実装.
- - ファイルセッションストアの不具合修正.
- - コントローラジェネレータの不具合修正.
- - Windows サービスとして起動したときに引数解析の不具合修正.
- - DB接続オブジェクトがリークする可能性がある不具合修正.
-
- [ダウンロードはこちらから](download/)
-
-### 2017/5/27  TreeFrog Framework バージョン1.17.0 （安定版）リリース
-
-  - If-Modified-Sinceヘッダの比較ロジックの不具合修正
-  - URLのトラバーサル不具合の修正
-  - 静的ファイルへのルーティング設定を追加
-  - バックグランドプロセスを実現するTBackgroundProcessクラスを追加
-  - その他バグフィックス
-
-### 2017/4/8  TreeFrog Framework バージョン1.16.0 （安定版）リリース
-
-  - リッスンIPアドレスの設定を追加
-  - DBオープン直後のSQL文実行の設定を追加
-  - マルチフィールドのorder byに対応した関数を追加
-  - GigHub Pages（日本語、英語）を追加
-  - その他バグフィックス
-
-### 2017/1/22  TreeFrog Framework バージョン1.15.0 （安定版）リリース
-
-  - 'tDebug() << "foo" ' のようなデバッグ出力に対応
-  - config-initializer関数を追加 （独自のコンフィグファイルを定義できるようになった）
-  - TSqlORMapper が C++11 スタイルの for 文に対応
-  - TFormValidator クラスの関数を修正
-  - その他バグフィックス
+C++/Qt で作られたサーバサイドのフレームワークであるので、スクリプト言語のものより高速に動作することが可能です。アプリケーション開発では、MVC アーキテクチャのもと O/R マッパーやテンプレートの仕組みを提供し、「設定より規約」のポリシーでプログラミング言語C++でも高い生産性の実現を目指しています。
 
 
-## 募集中
+## <i class="fa fa-flag" aria-hidden="true"></i> 特徴
 
-協力者を募集しています！ [GitHub](https://github.com/treefrogframework/treefrog-framework){:target="_blank"}にてバグ報告やプルリクエストをお待ちしています。
+TreeFrog Framework には次のような特徴があります。
 
- - 開発者、テスター、翻訳者
+  1. 高パフォーマンス ： 高度に最適化されたアプリケーションサーバエンジン  [外部のベンチマークサイト](http://www.techempower.com/benchmarks/){:target="_blank"}
+  2. O/R マッピング ： 複雑で面倒なデータベースコーディングを隠蔽
+  3. テンプレートシステム ： ERBライクなテンプレートエンジン
+  4. 多くのDBに対応 ： MySQL, PostgreSQL, ODBC, SQLite, MongoDB, Redis, etc.
+  5. クロスプラットフォーム ： Windows, macOS, Linuxで同じソースコードが動作
+  6. WebSocket 対応 ： サーバと双方向通信が可能
+  7. ジェネレータ ： 「足場」となるソースコードや Makefile を自動で生成
+  8. 低リソース：  ラズベリーパイでも軽快に動作
+  9. オープンソースソフトウェア ： New BSD License
 
- 当サイトは[GitHub Pages](https://pages.github.com/)で構築されているので、翻訳文をプルリクエストで送って頂くことができます。
 
-## TreeFrog Framework という選択
+## <i class="fa fa-comment" aria-hidden="true"></i> TreeFrog Framework という選択
 
 Webアプリの開発において、開発効率と動作速度はトレードオフの関係があると言われますが、本当にそうなのでしょうか？
 
@@ -70,21 +37,41 @@ Webアプリの開発において、開発効率と動作速度はトレード�
 スクリプト言語で稼働している複数のアプリケーションサーバを、パフォーマンスを低下させることなく１台に集約できます。
 高い生産性と高速動作を両立した TreeFrog Framework をぜひお試し下さい。
 
-## 特徴
 
-TreeFrog Framework は次のような特徴を兼ね備えています。
+## <i class="fa fa-bell" aria-hidden="true"></i> お知らせ
 
- 1. 高いパフォーマンス ： 高度に最適化されたアプリケーションサーバエンジン  [外部のベンチマークサイト](http://www.techempower.com/benchmarks/){:target="_blank"}
- 2. O/R マッピング ： 複雑で面倒なデータベースアクセスを隠蔽
- 3. テンプレートシステム ： テンプレートとプレゼンテーションロジックを完全に分離
- 4. 多くのDBに対応 ： MySQL, PostgreSQL, ODBC, SQLite, Oracle, DB2, InterBase, MongoDB, Redis.
- 5. クロスプラットフォーム ： Windows, Mac OS X, Linux など。同じコードが他のプラットフォームでも動作。
- 6. WebSocket 対応 ： サーバと双方向通信を可能とします
- 7. ジェネレータ ： 「足場」となるソースコードや Makefile を自動で生成
- 8. 低リソース：  ラズベリーパイでも軽快に動作
- 9. オープンソースソフトウェア ： New BSD License
+### 2017/9/20  TreeFrog Framework バージョン1.19.0 （安定版）リリース <span style="color: red;">New!</span>
 
-## インフォメーション
+  - Upsert文のためにTSqlDriverExtensionクラスを追加
+  - QStringタイプの引数を持つSQLソート関数を追加
+  - URLパスへリダイレクトできる仕組みをroutes.cfgへ追加
+  - ステータスコードが304の場合に空ボディのメッセージを送信するよう変更
+  - FreeBSDでのコンパイルエラーの解消
+  - その他バグフィックス
+
+ [<i class="fa fa-hand-o-right" aria-hidden="true"></i> ダウンロードはこちらから](download/)
+
+### 2017/7/1  TreeFrog Framework バージョン1.18.0 （安定版）リリース
+
+ - MongoDBへのセッションストアを実装.
+ - ファイルセッションストアの不具合修正.
+ - コントローラジェネレータの不具合修正.
+ - Windows サービスとして起動したときに引数解析の不具合修正.
+ - DB接続オブジェクトがリークする可能性がある不具合修正.
+
+ [<i class="fa fa-list" aria-hidden="true"></i> 全ての変更履歴](https://github.com/treefrogframework/treefrog-framework/blob/master/CHANGELOG.md)
+
+
+## <i class="fa fa-user" aria-hidden="true"></i> 募集中
+
+協力者を募集しています！ [GitHub](https://github.com/treefrogframework/treefrog-framework){:target="_blank"}にてバグ報告やプルリクエストをお待ちしています。
+
+ - 開発者、テスター、翻訳者
+
+ 当サイトは[GitHub Pages](https://pages.github.com/)で構築されているので、翻訳文をプルリクエストで送って頂くことができます。
+
+
+## <i class="fa fa-info-circle" aria-hidden="true"></i> インフォメーション
 
  開発は主にGitHubで行われていますが[TreeFrogフォーラム](https://groups.google.com/forum/#!forum/treefrogframework){:target="_blank"}もあります。
 
