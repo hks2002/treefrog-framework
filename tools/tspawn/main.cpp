@@ -6,7 +6,6 @@
  */
 
 #include <QtCore>
-#include <QtSql>
 #include "global.h"
 #include "controllergenerator.h"
 #include "modelgenerator.h"
@@ -173,8 +172,8 @@ public:
         append(L("public") + SEP + "500.html");
         append(L("script") + SEP + "JSXTransformer.js");
         append(L("script") + SEP + "react.js");             // React
-        append(L("script") + SEP + "react-with-addons.js");   // React
-        append(L("script") + SEP + "react-dom-server.js");   // React
+        append(L("script") + SEP + "react-with-addons.js"); // React
+        append(L("script") + SEP + "react-dom-server.js");  // React
     }
 };
 Q_GLOBAL_STATIC(FilePaths, filePaths)
@@ -211,23 +210,19 @@ static void usage()
 }
 
 
-static QStringList rmfiles(const QStringList &files, bool &allRemove, bool &quit,
-                           const QString &baseDir, const QString &proj = QString())
+static QStringList rmfiles(const QStringList &files, bool &allRemove, bool &quit, const QString &baseDir, const QString &proj = QString())
 {
     QStringList rmd;
 
     // Removes files
-    for (QStringListIterator i(files); i.hasNext();) {
-        if (quit) {
+    for (QStringListIterator i(files); i.hasNext(); ) {
+        if (quit)
             break;
-        }
 
         const QString &fname = i.next();
         QFile file(baseDir + SEP + fname);
-
-        if (!file.exists()) {
+        if (!file.exists())
             continue;
-        }
 
         if (allRemove) {
             remove(file);
@@ -236,53 +231,43 @@ static QStringList rmfiles(const QStringList &files, bool &allRemove, bool &quit
         }
 
         QTextStream stream(stdin);
-
         for (;;) {
             printf("  remove  %s? [ynaqh] ", qPrintable(QDir::cleanPath(file.fileName())));
 
             QString line = stream.readLine();
-
-            if (line.isNull()) {
+            if (line.isNull())
                 break;
-            }
 
-            if (line.isEmpty()) {
+            if (line.isEmpty())
                 continue;
-            }
 
             QCharRef c = line[0];
-
             if (c == 'Y' || c == 'y') {
                 remove(file);
                 rmd << fname;
                 break;
 
-            }
-            else if (c == 'N' || c == 'n') {
+            } else if (c == 'N' || c == 'n') {
                 break;
 
-            }
-            else if (c == 'A' || c == 'a') {
+            } else if (c == 'A' || c == 'a') {
                 allRemove = true;
                 remove(file);
                 rmd << fname;
                 break;
 
-            }
-            else if (c == 'Q' || c == 'q') {
+            } else if (c == 'Q' || c == 'q') {
                 quit = true;
                 break;
 
-            }
-            else if (c == 'H' || c == 'h') {
+            } else if (c == 'H' || c == 'h') {
                 printf("   y - yes, remove\n");
                 printf("   n - no, do not remove\n");
                 printf("   a - all, remove this and all others\n");
                 printf("   q - quit, abort\n");
                 printf("   h - help, show this help\n\n");
 
-            }
-            else {
+            } else {
                 // one more
             }
         }
@@ -320,7 +305,6 @@ static QByteArray randomString(int length)
     for (int i = 0; i < length; ++i) {
         ret += ch[random(max)];
     }
-
     return ret;
 }
 
@@ -328,29 +312,25 @@ static QByteArray randomString(int length)
 static bool createNewApplication(const QString &name)
 {
     if (name.isEmpty()) {
-        qCritical("invalid argument");
+         qCritical("invalid argument");
         return false;
     }
 
     QDir dir(".");
-
     if (dir.exists(name)) {
         qCritical("directory already exists");
         return false;
     }
-
     if (!dir.mkdir(name)) {
         qCritical("failed to create a directory %s", qPrintable(name));
         return false;
     }
-
     printf("  created   %s\n", qPrintable(name));
 
     // Creates sub-directories
-    for (QStringListIterator i(*subDirs()); i.hasNext();) {
+    for (QStringListIterator i(*subDirs()); i.hasNext(); ) {
         const QString &str = i.next();
         QString d = name + SEP + str;
-
         if (!mkpath(dir, d)) {
             return false;
         }
@@ -359,7 +339,7 @@ static bool createNewApplication(const QString &name)
     // Copies files
     copy(dataDirPath + "app.pro", name + SEP + name + ".pro");
 
-    for (QStringListIterator it(*filePaths()); it.hasNext();) {
+    for (QStringListIterator it(*filePaths()); it.hasNext(); ) {
         const QString &path = it.next();
         QString filename = QFileInfo(path).fileName();
         QString dst = name + SEP + path;
@@ -395,16 +375,14 @@ static int deleteScaffold(const QString &name)
 
         rmfiles(helpers, D_HELPERS, "helpers.pro");
 
-    }
-    else if (str.endsWith("validator", Qt::CaseInsensitive)) {
+    } else if (str.endsWith("validator", Qt::CaseInsensitive)) {
         QStringList helpers;
         helpers << str + ".h"
                 << str + ".cpp";
 
         rmfiles(helpers, D_HELPERS, "helpers.pro");
 
-    }
-    else {
+    } else {
         QStringList ctrls, models, views;
         ctrls << str + "controller.h"
               << str + "controller.cpp";
@@ -424,14 +402,12 @@ static int deleteScaffold(const QString &name)
                   << str + SEP + "create.otm"
                   << str + SEP + "save.html"
                   << str + SEP + "save.otm";
-        }
-        else if (templateSystem == "erb") {
+        } else if (templateSystem == "erb") {
             views << str + SEP + "index.erb"
                   << str + SEP + "show.erb"
                   << str + SEP + "create.erb"
                   << str + SEP + "save.erb";
-        }
-        else {
+        } else {
             qCritical("Invalid template system specified: %s", qPrintable(templateSystem));
             return 2;
         }
@@ -441,7 +417,6 @@ static int deleteScaffold(const QString &name)
 
         // Removes controllers
         rmfiles(ctrls, allRemove, quit, D_CTRLS, "controllers.pro");
-
         if (quit) {
             ::_exit(1);
             return 1;
@@ -449,7 +424,6 @@ static int deleteScaffold(const QString &name)
 
         // Removes models
         rmfiles(models, allRemove, quit, D_MODELS, "models.pro");
-
         if (quit) {
             ::_exit(1);
             return 1;
@@ -457,7 +431,6 @@ static int deleteScaffold(const QString &name)
 
         // Removes views
         QStringList rmd = rmfiles(views, allRemove, quit, D_VIEWS);
-
         if (!rmd.isEmpty()) {
             QString path = D_VIEWS + "_src" + SEP + str;
             QFile::remove(path + "_indexView.cpp");
@@ -469,7 +442,6 @@ static int deleteScaffold(const QString &name)
         // Removes the sub-directory
         rmpath(D_VIEWS + str);
     }
-
     return 0;
 }
 
@@ -479,11 +451,9 @@ static bool checkIniFile()
     // Checking INI file
     if (!QFile::exists(appIni)) {
         qCritical("INI file not found, %s", qPrintable(appIni));
-        qCritical("Execute %s command in application root directory!",
-                  qPrintable(QCoreApplication::arguments().value(0)));
+        qCritical("Execute %s command in application root directory!", qPrintable(QCoreApplication::arguments().value(0)));
         return false;
     }
-
     return true;
 }
 
@@ -491,7 +461,6 @@ static bool checkIniFile()
 static void printSuccessMessage(const QString &model)
 {
     QString msg;
-
     if (!QFile("Makefile").exists()) {
         QProcess cmd;
         QStringList args;
@@ -525,15 +494,14 @@ static void printSuccessMessage(const QString &model)
 
     putchar('\n');
     int port = appSettings.value("ListenPort").toInt();
-
-    if (port > 0 && port <= USHRT_MAX) {
+    if (port > 0 && port <= USHRT_MAX)
         printf(" Index page URL:  http://localhost:%d/%s/index\n\n", port, qPrintable(model));
-    }
 
     if (!msg.isEmpty()) {
         puts(qPrintable(msg));
     }
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -553,55 +521,42 @@ int main(int argc, char *argv[])
         break;
 
     case New:
-
         // Creates new project
         if (!createNewApplication(args.value(2))) {
             return 1;
         }
-
         break;
 
     case ShowDrivers:
         printf("Available database drivers for Qt:\n");
-
-        for (QStringListIterator i(TableSchema::databaseDrivers()); i.hasNext();) {
+        for (QStringListIterator i(TableSchema::databaseDrivers()); i.hasNext(); ) {
             printf("  %s\n", qPrintable(i.next()));
         }
-
         break;
 
     case ShowDriverPath: {
-            QString path = QLibraryInfo::location(QLibraryInfo::PluginsPath) + QDir::separator() +
-                           "sqldrivers";
-            QFileInfo fi(path);
-
-            if (!fi.exists() || !fi.isDir()) {
-                qCritical("Error: database driver's directory not found");
-                return 1;
-            }
-
-            printf("%s\n", qPrintable(fi.canonicalFilePath()));
-            break;
+        QString path = QLibraryInfo::location(QLibraryInfo::PluginsPath) + QDir::separator() + "sqldrivers";
+        QFileInfo fi(path);
+        if (!fi.exists() || !fi.isDir()) {
+            qCritical("Error: database driver's directory not found");
+            return 1;
         }
+        printf("%s\n", qPrintable(fi.canonicalFilePath()));
+        break; }
 
     case ShowTables:
         if (checkIniFile()) {
             QStringList tables = TableSchema::tables();
-
             if (!tables.isEmpty()) {
                 printf("-----------------\nAvailable tables:\n");
-
-                for (QStringListIterator i(tables); i.hasNext();) {
+                for (QStringListIterator i(tables); i.hasNext(); ) {
                     printf("  %s\n", qPrintable(i.next()));
                 }
-
                 putchar('\n');
             }
-        }
-        else {
+        } else {
             return 2;
         }
-
         break;
 
     case ShowCollections:
@@ -616,238 +571,184 @@ int main(int argc, char *argv[])
             }
 
             MongoCommand mongo(mnginipath);
-
             if (!mongo.open("dev")) {
                 return 2;
             }
 
             QStringList colls = mongo.getCollectionNames();
             printf("-----------------\nExisting collections:\n");
-
             for (auto &col : colls) {
                 printf("  %s\n", qPrintable(col));
             }
-
             putchar('\n');
         }
-
         break;
 
     default: {
-            if (argc < 3) {
-                qCritical("invalid argument");
-                return 1;
-            }
+        if (argc < 3) {
+            qCritical("invalid argument");
+            return 1;
+        }
 
-            if (!checkIniFile()) {
+        if (!checkIniFile()) {
+            return 2;
+        }
+
+        // Sets codec
+        QTextCodec *codec = QTextCodec::codecForName(appSettings.value("InternalEncoding").toByteArray().trimmed());
+        codec = (codec) ? codec : QTextCodec::codecForLocale();
+        QTextCodec::setCodecForLocale(codec);
+#if QT_VERSION < 0x050000
+        QTextCodec::setCodecForTr(codec);
+        QTextCodec::setCodecForCStrings(codec);
+#endif
+
+        // ERB or Otama
+        templateSystem = devSettings.value("TemplateSystem").toString().toLower();
+        if (templateSystem.isEmpty()) {
+            templateSystem = appSettings.value("TemplateSystem", "Erb").toString().toLower();
+        }
+
+        switch (subcmd) {
+        case Controller: {
+            QString ctrl = args.value(2);
+            ControllerGenerator crtlgen(ctrl, args.mid(3));
+            crtlgen.generate(D_CTRLS);
+
+            // Create view directory
+            QDir dir(D_VIEWS + ((ctrl.contains('_')) ? ctrl.toLower() : fieldNameToVariableName(ctrl).toLower()));
+            mkpath(dir, ".");
+            copy(dataDirPath + ".trim_mode", dir);
+            break; }
+
+        case Model: {
+            ModelGenerator modelgen(ModelGenerator::Sql, args.value(3), args.value(2));
+            modelgen.generate(D_MODELS);
+            break; }
+
+        case Helper: {
+            HelperGenerator helpergen(args.value(2));
+            helpergen.generate(D_HELPERS);
+            break; }
+
+        case UserModel: {
+            ModelGenerator modelgen(ModelGenerator::Sql, args.value(5), args.value(2), args.mid(3, 2));
+            modelgen.generate(D_MODELS, true);
+            break; }
+
+        case SqlObject: {
+            SqlObjGenerator sqlgen(args.value(3), args.value(2));
+            QString path = sqlgen.generate(D_MODELS);
+
+            // Generates a project file
+            ProjectFileGenerator progen(D_MODELS + "models.pro");
+            progen.add(QStringList(path));
+            break; }
+
+        case MongoScaffold: {
+            ModelGenerator modelgen(ModelGenerator::Mongo, args.value(2));
+            bool success = modelgen.generate(D_MODELS);
+
+            ControllerGenerator crtlgen(modelgen.model(), modelgen.fieldList(), modelgen.primaryKeyIndex(), modelgen.lockRevisionIndex());
+            success &= crtlgen.generate(D_CTRLS);
+
+            // Generates view files of the specified template system
+            if (templateSystem == "otama") {
+                OtamaGenerator viewgen(modelgen.model(), modelgen.fieldList(), modelgen.primaryKeyIndex(), modelgen.autoValueIndex());
+                viewgen.generate(D_VIEWS);
+            } else if (templateSystem == "erb") {
+                ErbGenerator viewgen(modelgen.model(), modelgen.fieldList(), modelgen.primaryKeyIndex(), modelgen.autoValueIndex());
+                viewgen.generate(D_VIEWS);
+            } else {
+                qCritical("Invalid template system specified: %s", qPrintable(templateSystem));
                 return 2;
             }
 
-            // Sets codec
-            QTextCodec *codec = QTextCodec::codecForName(
-                                    appSettings.value("InternalEncoding").toByteArray().trimmed());
-            codec = (codec) ? codec : QTextCodec::codecForLocale();
-            QTextCodec::setCodecForLocale(codec);
-#if QT_VERSION < 0x050000
-            QTextCodec::setCodecForTr(codec);
-            QTextCodec::setCodecForCStrings(codec);
-#endif
+            if (success) {
+                printSuccessMessage(modelgen.model());
+            }
+            break; }
 
-            // ERB or Otama
-            templateSystem = devSettings.value("TemplateSystem").toString().toLower();
+        case MongoModel: {
+            ModelGenerator modelgen(ModelGenerator::Mongo, args.value(2));
+            modelgen.generate(D_MODELS);
+            break; }
 
-            if (templateSystem.isEmpty()) {
-                templateSystem = appSettings.value("TemplateSystem", "Erb").toString().toLower();
+        case WebSocketEndpoint: {
+            const QString appendpointfiles[] = { L("controllers") + SEP + "applicationendpoint.h",
+                                                 L("controllers") + SEP + "applicationendpoint.cpp" };
+
+            ProjectFileGenerator progen(D_CTRLS + "controllers.pro");
+
+            for (auto &dst : appendpointfiles) {
+                if (!QFile::exists(dst)) {
+                    QString filename = QFileInfo(dst).fileName();
+                    copy(dataDirPath + filename, dst);
+                    progen.add(QStringList(filename));
+                }
             }
 
-            switch (subcmd) {
-            case Controller: {
-                    QString ctrl = args.value(2);
-                    ControllerGenerator crtlgen(ctrl, args.mid(3));
-                    crtlgen.generate(D_CTRLS);
+            WebSocketGenerator wsgen(args.value(2));
+            wsgen.generate(D_CTRLS);
+            break; }
 
-                    // Create view directory
-                    QDir dir(D_VIEWS + ((ctrl.contains('_')) ? ctrl.toLower() : fieldNameToVariableName(
-                                            ctrl).toLower()));
-                    mkpath(dir, ".");
-                    copy(dataDirPath + ".trim_mode", dir);
+        case Validator: {
+            ValidatorGenerator validgen(args.value(2));
+            validgen.generate(D_HELPERS);
+            break; }
 
-                    QFile file(dataDirPath + "tbd.erb");
+        case Mailer: {
+            MailerGenerator mailgen(args.value(2), args.mid(3));
+            mailgen.generate(D_CTRLS);
+            copy(dataDirPath + "mail.erb", D_VIEWS + "mailer" + SEP +"mail.erb");
+            break; }
 
-                    if (file.exists()) {
-                        if (templateSystem == "otama") {
-                            for (QString action : args.mid(3)) {
-                                copy(dataDirPath + "tbd.erb", dir.absolutePath() + SEP + action + ".html");
-                            }
-                        }
+        case Scaffold: {
+            ModelGenerator modelgen(ModelGenerator::Sql, args.value(3), args.value(2));
+            bool success = modelgen.generate(D_MODELS);
 
-                        if (templateSystem == "erb") {
-                            for (QString action : args.mid(3)) {
-                                copy(dataDirPath + "tbd.erb", dir.absolutePath() + SEP + action + ".erb");
-                            }
-                        }
+            if (!success)
+                return 2;
 
-                    }
-                    else {
-                        printf("%s not exists!\n", qPrintable(file.fileName()));
-                    }
-
-                    break;
-                }
-
-            case Model: {
-                    ModelGenerator modelgen(ModelGenerator::Sql, args.value(3), args.value(2));
-                    modelgen.generate(D_MODELS);
-                    break;
-                }
-
-            case Helper: {
-                    HelperGenerator helpergen(args.value(2));
-                    helpergen.generate(D_HELPERS);
-                    break;
-                }
-
-            case UserModel: {
-                    ModelGenerator modelgen(ModelGenerator::Sql, args.value(5), args.value(2), args.mid(3, 2));
-                    modelgen.generate(D_MODELS, true);
-                    break;
-                }
-
-            case SqlObject: {
-                    SqlObjGenerator sqlgen(args.value(3), args.value(2));
-                    QString path = sqlgen.generate(D_MODELS);
-
-                    // Generates a project file
-                    ProjectFileGenerator progen(D_MODELS + "models.pro");
-                    progen.add(QStringList(path));
-                    break;
-                }
-
-            case MongoScaffold: {
-                    ModelGenerator modelgen(ModelGenerator::Mongo, args.value(2));
-                    bool success = modelgen.generate(D_MODELS);
-
-                    ControllerGenerator crtlgen(modelgen);
-                    success &= crtlgen.generate(D_CTRLS);
-
-                    // Generates view files of the specified template system
-                    if (templateSystem == "otama") {
-                        OtamaGenerator viewgen(modelgen);
-                        viewgen.generate(D_VIEWS);
-                    }
-                    else if (templateSystem == "erb") {
-                        ErbGenerator viewgen(modelgen);
-                        viewgen.generate(D_VIEWS);
-                    }
-                    else {
-                        qCritical("Invalid template system specified: %s", qPrintable(templateSystem));
-                        return 2;
-                    }
-
-                    if (success) {
-                        printSuccessMessage(modelgen.model());
-                    }
-
-                    break;
-                }
-
-            case MongoModel: {
-                    ModelGenerator modelgen(ModelGenerator::Mongo, args.value(2));
-                    modelgen.generate(D_MODELS);
-                    break;
-                }
-
-            case WebSocketEndpoint: {
-                    const QString appendpointfiles[] = { L("controllers") + SEP + "applicationendpoint.h",
-                                                         L("controllers") + SEP + "applicationendpoint.cpp"
-                                                       };
-
-                    ProjectFileGenerator progen(D_CTRLS + "controllers.pro");
-
-                    for (auto &dst : appendpointfiles) {
-                        if (!QFile::exists(dst)) {
-                            QString filename = QFileInfo(dst).fileName();
-                            copy(dataDirPath + filename, dst);
-                            progen.add(QStringList(filename));
-                        }
-                    }
-
-                    WebSocketGenerator wsgen(args.value(2));
-                    wsgen.generate(D_CTRLS);
-                    break;
-                }
-
-            case Validator: {
-                    ValidatorGenerator validgen(args.value(2));
-                    validgen.generate(D_HELPERS);
-                    break;
-                }
-
-            case Mailer: {
-                    MailerGenerator mailgen(args.value(2), args.mid(3));
-                    mailgen.generate(D_CTRLS);
-                    copy(dataDirPath + "mail.erb", D_VIEWS + "mailer" + SEP + "mail.erb");
-                    break;
-                }
-
-            case Scaffold: {
-                    ModelGenerator modelgen(ModelGenerator::Sql, args.value(3), args.value(2));
-                    bool success = modelgen.generate(D_MODELS);
-
-                    if (!success) {
-                        return 2;
-                    }
-
-                    QList<int> pkidxs = modelgen.primaryKeyIndexList();
-
-                    if (pkidxs.isEmpty()) {
-                        qWarning("Primary key not found. [table name: %s]", qPrintable(args.value(2)));
-                        return 2;
-                    }
-
-                    ControllerGenerator crtlgen(modelgen);
-                    success &= crtlgen.generate(D_CTRLS);
-
-                    // Generates view files of the specified template system
-                    if (templateSystem == "otama") {
-                        OtamaGenerator viewgen(modelgen);
-                        viewgen.generate(D_VIEWS);
-                    }
-                    else if (templateSystem == "erb") {
-                        ErbGenerator viewgen(modelgen);
-                        viewgen.generate(D_VIEWS);
-                    }
-                    else {
-                        qCritical("Invalid template system specified: %s", qPrintable(templateSystem));
-                        return 2;
-                    }
-
-                    if (success) {
-                        printSuccessMessage(modelgen.model());
-                    }
-
-                    break;
-                }
-
-            case Delete: {
-                    // Removes files
-                    int ret = deleteScaffold(args.value(2));
-
-                    if (ret) {
-                        return ret;
-                    }
-
-                    break;
-                }
-
-            default:
-                qCritical("internal error");
-                return 1;
+            int pkidx = modelgen.primaryKeyIndex();
+            if (pkidx < 0) {
+                qWarning("Primary key not found. [table name: %s]", qPrintable(args.value(2)));
+                return 2;
             }
 
-            break;
+            ControllerGenerator crtlgen(modelgen.model(), modelgen.fieldList(), pkidx, modelgen.lockRevisionIndex());
+            success &= crtlgen.generate(D_CTRLS);
+
+            // Generates view files of the specified template system
+            if (templateSystem == "otama") {
+                OtamaGenerator viewgen(modelgen.model(), modelgen.fieldList(), pkidx, modelgen.autoValueIndex());
+                viewgen.generate(D_VIEWS);
+            } else if (templateSystem == "erb") {
+                ErbGenerator viewgen(modelgen.model(), modelgen.fieldList(), pkidx, modelgen.autoValueIndex());
+                viewgen.generate(D_VIEWS);
+            } else {
+                qCritical("Invalid template system specified: %s", qPrintable(templateSystem));
+                return 2;
+            }
+
+            if (success) {
+                printSuccessMessage(modelgen.model());
+            }
+            break; }
+
+        case Delete: {
+            // Removes files
+            int ret = deleteScaffold(args.value(2));
+            if (ret) {
+                return ret;
+            }
+            break; }
+
+        default:
+            qCritical("internal error");
+            return 1;
         }
+        break; }
     }
-
     return 0;
 }

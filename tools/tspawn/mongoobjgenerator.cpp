@@ -69,7 +69,7 @@ const QRegExp rxstart("\\{\\s*public\\s*:", Qt::CaseSensitive, QRegExp::RegExp2)
 
 
 MongoObjGenerator::MongoObjGenerator(const QString &model)
-    : modelName(), collectionName(model), fieldlist()
+    : modelName(), collectionName(model), fields()
 {
     modelName = fieldNameToEnumName(model);
 }
@@ -88,14 +88,11 @@ QString MongoObjGenerator::generate(const QString &dstDir)
 
     if (fi.exists()) {
         updateMongoObject(mobjpath);
-    }
-    else {
+    } else {
         QDir dir = fi.dir();
-
         if (!dir.exists()) {
             dir.mkpath(".");
         }
-
         createMongoObject(mobjpath);
     }
 
@@ -103,16 +100,17 @@ QString MongoObjGenerator::generate(const QString &dstDir)
 }
 
 
-static QStringList generateCode(const QStringList &fieldList, const QStringList &fieldTypeList)
+static QStringList generateCode(const QList<QPair<QString, QVariant::Type>> &fieldList)
 {
     QString params, enums, macros;
 
-    for (int i = 0; i < fieldList.length(); ++i) {
-        params += QString("    %1 %2;\n").arg(fieldTypeList[i], fieldList[i]);
-        macros += QString(MONGOOBJECT_PROPERTY_TEMPLATE).arg(fieldTypeList[i], fieldList[i]);
-        QString estr = fieldNameToEnumName(fieldList[i]);
-        enums  += (enums.isEmpty()) ? QString("        %1 = 0,\n").arg(estr) : QString("        %1,\n").arg(
-                      estr);
+    for (QListIterator<QPair<QString, QVariant::Type>> it(fieldList); it.hasNext(); ) {
+        const QPair<QString, QVariant::Type> &p = it.next();
+        QString typeName = QVariant::typeToName(p.second);
+        params += QString("    %1 %2;\n").arg(typeName, p.first);
+        macros += QString(MONGOOBJECT_PROPERTY_TEMPLATE).arg(typeName, p.first);
+        QString estr = fieldNameToEnumName(p.first);
+        enums  += (enums.isEmpty()) ? QString("        %1 = 0,\n").arg(estr) : QString("        %1,\n").arg(estr);
     }
 
     return QStringList() << params << enums << macros;
@@ -121,25 +119,25 @@ static QStringList generateCode(const QStringList &fieldList, const QStringList 
 
 bool MongoObjGenerator::createMongoObject(const QString &path)
 {
-    fieldlist << QString("_id") << QString("createdAt") << QString("updatedAt") <<
-              QString("lockRevision");
-    fieldtypelist << QString("String") << QString("DateTime") << QString("DateTime") << QString("Int");
-    QStringList code = generateCode(fieldlist, fieldtypelist);
-    QString output = QString(MONGOOBJECT_HEADER_TEMPLATE).arg(modelName.toUpper(), modelName, code[0],
-                     code[1], collectionName, code[2]);
+    fields << qMakePair(QString("_id"), QVariant::String)
+           << qMakePair(QString("createdAt"), QVariant::DateTime)
+           << qMakePair(QString("updatedAt"), QVariant::DateTime)
+           << qMakePair(QString("lockRevision"), QVariant::Int);
+
+    QStringList code = generateCode(fields);
+    QString output = QString(MONGOOBJECT_HEADER_TEMPLATE).arg(modelName.toUpper(), modelName, code[0], code[1], collectionName, code[2]);
     // Writes to a file
     return FileWriter(path).write(output, false);
 }
 
 
-void MongoObjGenerator::updateFieldAndTypeList(const QString &filePath)
+static QList<QPair<QString, QVariant::Type>> getFieldList(const QString &filePath)
 {
-    QStringList fields, fieldTypes;
+    QList<QPair<QString, QVariant::Type>> ret;
     QRegExp rxend("(\\n[\\t\\r ]*\\n|\\senum\\s)", Qt::CaseSensitive, QRegExp::RegExp2);
     QRegExp rx("\\s([a-zA-Z0-9_<>]+)\\s+([a-zA-Z0-9_]+)\\s*;", Qt::CaseSensitive, QRegExp::RegExp2);
 
     QFile file(filePath);
-
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qCritical("file open error: %s", qPrintable(filePath));
         _exit(1);
@@ -147,31 +145,23 @@ void MongoObjGenerator::updateFieldAndTypeList(const QString &filePath)
 
     QString src = QString::fromUtf8(file.readAll().data());
     int pos = rxstart.indexIn(src, 0);
-
     if (pos < 0) {
         qCritical("parse error");
         _exit(1);
     }
-
     pos += rxstart.matchedLength();
 
     int end = rxend.indexIn(src, pos);
-
     while ((pos = rx.indexIn(src, pos)) > 0 && pos < end) {
         QVariant::Type type = QVariant::nameToType(rx.cap(1).toLatin1().data());
         QString var = rx.cap(2);
-
-        if (type != QVariant::Invalid && var.toLower() != "id") {
-            fields << var;
-            fieldTypes << rx.cap(1).toLatin1().data();
-        }
-
+        if (type != QVariant::Invalid && var.toLower() != "id")
+            ret << QPair<QString, QVariant::Type>(var, type);
         pos += rx.matchedLength();
     }
-
-    fieldlist = fields;
-    fieldtypelist = fieldTypes;
+    return ret;
 }
+
 
 bool MongoObjGenerator::updateMongoObject(const QString &path)
 {
@@ -186,66 +176,52 @@ bool MongoObjGenerator::updateMongoObject(const QString &path)
     QString headerpart;
 
     int pos = rxstart.indexIn(src, 0);
-
     if (pos > 0) {
         pos += rxstart.matchedLength();
         headerpart = src.mid(0, pos);
     }
 
-    updateFieldAndTypeList(path);
-    QStringList prop = generateCode(fieldList(), fieldTypeList());
-    QString output = QString(MONGOOBJECT_HEADER_UPDATE_TEMPLATE).arg(modelName.toUpper(),
-                     collectionName, headerpart, prop[0], prop[1], prop[2]);
+    fields = getFieldList(path);
+    QStringList prop = generateCode(fields);
+    QString output = QString(MONGOOBJECT_HEADER_UPDATE_TEMPLATE).arg(modelName.toUpper(), collectionName, headerpart, prop[0], prop[1], prop[2]);
     // Writes to a file
     return FileWriter(path).write(output, true);
 }
 
 
-QList<int> MongoObjGenerator::primaryKeyIndexList() const
+int MongoObjGenerator::primaryKeyIndex() const
 {
-    QList<int> pkidxList;
-
-    if (fieldlist.isEmpty()) {
+    if (fields.isEmpty()) {
         qCritical("Mongo file not generated");
-        return pkidxList;
+        return -1;
     }
 
-    for (int i = 0; i < fieldlist.count(); ++i) {
-        if (fieldlist[i] == "_id") {
-            return pkidxList << i;
-        }
+    for (int i = 0; i < fields.count(); ++i) {
+        if (fields[i].first == "_id")
+            return i;
     }
-
-    return pkidxList;
+    return -1;
 }
 
 
 int MongoObjGenerator::autoValueIndex() const
 {
-    if (primaryKeyIndexList().isEmpty()) {
-        return -1;
-    }
-    else {
-        return primaryKeyIndexList()[0];
-    }
+    return primaryKeyIndex();
 }
 
 
 int MongoObjGenerator::lockRevisionIndex() const
 {
-    if (fieldlist.isEmpty()) {
+    if (fields.isEmpty()) {
         qCritical("Mongo file not generated");
         return -1;
     }
 
-    for (int i = 0; i < fieldlist.count(); ++i) {
-        QString var = fieldNameToVariableName(fieldlist[i]);
-
-        if (var == "lockRevision") {
+    for (int i = 0; i < fields.count(); ++i) {
+        QString var = fieldNameToVariableName(fields[i].first);
+        if (var == "lockRevision")
             return i;
-        }
     }
-
     return -1;
 
 }

@@ -13,16 +13,16 @@ class TableSchema
 public:
     TableSchema(const QString &table, const QString &env = "dev");
     bool exists() const;
-    QStringList fieldList() const;
-    QStringList fieldTypeList() const;
-    QStringList refTableList() const;
-    QList<QStringList> refTableFieldList() const;
-    QStringList reffedTableList() const;
-    QList<QStringList> reffedTableFieldList() const;
-    QList<int> primaryKeyIndexList() const;
+    QList<QPair<QString, QString>> getFieldList() const;
+    QList<QPair<QString, QVariant::Type>> getFieldTypeList() const;
+    int primaryKeyIndex() const;
+    QString primaryKeyFieldName() const;
     int autoValueIndex() const;
-    int lockRevisionIndex() const;
+    QString autoValueFieldName() const;
+    QPair<QString, QString> getPrimaryKeyField() const;
+    QPair<QString, QVariant::Type> getPrimaryKeyFieldType() const;
     QString tableName() const { return tablename; }
+    int lockRevisionIndex() const;
     bool hasLockRevisionField() const;
     static QStringList databaseDrivers();
     static QStringList tables(const QString &env = "dev");

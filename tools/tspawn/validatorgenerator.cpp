@@ -32,7 +32,6 @@
     "\n"                                                \
     "%2Validator::%2Validator() : TFormValidator()\n"   \
     "{\n"                                               \
-    "    //TODO %2Validator \n"                         \
     "    // Set the rules below\n"                      \
     "    //setRule(\"xxxx\", Tf::MaxLength, 20);\n"     \
     "    //  :\n"                                       \

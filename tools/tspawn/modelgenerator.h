@@ -20,17 +20,12 @@ public:
         Mongo,
     };
 
-    ModelGenerator(ObjectType type, const QString &model, const QString &table = QString(),
-                   const QStringList &userModelFields = QStringList());
+    ModelGenerator(ObjectType type, const QString &model, const QString &table = QString(), const QStringList &userModelFields = QStringList());
     ~ModelGenerator();
+
     bool generate(const QString &dst, bool userModel = false);
-    QStringList fieldList() const;
-    QStringList fieldTypeList() const;
-    QList<int> primaryKeyIndexList() const;
-    QStringList refTableList() const;
-    QList<QStringList> refTableFieldList() const;
-    QStringList reffedTableList() const;
-    QList<QStringList> reffedTableFieldList() const;
+    FieldList fieldList() const;
+    int primaryKeyIndex() const;
     int autoValueIndex() const;
     int lockRevisionIndex() const;
     QString model() const { return modelName; }
@@ -43,7 +38,7 @@ protected:
     QPair<PlaceholderList, PlaceholderList> createModelParams();
 
     static void gen(const QString &fileName, const QString &format, const QList<QPair<QString, QString>> &values);
-    static QString createParam(const QString &type, const QString &name);
+    static QString createParam(QVariant::Type type, const QString &name);
 
 private:
     ObjectType objectType;

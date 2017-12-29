@@ -30,7 +30,6 @@
     "class TModelObject;\n"                              \
     "class %model%Object;\n"                             \
     "%7%"                                                \
-    "%classTable%"                                       \
     "\n\n"                                               \
     "class T_MODEL_EXPORT %model% : public TAbstractModel\n" \
     "{\n"                                                \
@@ -75,7 +74,6 @@
     "#include <TreeFrogModel>\n"                              \
     "#include \"%inc%.h\"\n"                                  \
     "#include \"%inc%object.h\"\n"                            \
-    "%includeTable%"                                          \
     "\n"                                                      \
     "%model%::%model%()\n"                                    \
     "    : TAbstractModel(), d(new %model%Object())\n"        \
@@ -134,8 +132,8 @@
     "{\n"                                                     \
     "    return tfGetModelListBy%11%Criteria<%model%, %model%Object>(TCriteria());\n" \
     "}\n"                                                     \
-    "%12%"                                                    \
     "\n"                                                      \
+    "%12%"                                                    \
     "TModelObject *%model%::modelData()\n"                    \
     "{\n"                                                     \
     "    return d.data();\n"                                  \
@@ -164,7 +162,6 @@
     "// Don't remove below this line\n"                       \
     "T_REGISTER_STREAM_OPERATORS(%model%)\n"
 
-
 #define USER_MODEL_HEADER_FILE_TEMPLATE                  \
     "#ifndef %head%_H\n"                                 \
     "#define %head%_H\n"                                 \
@@ -180,7 +177,6 @@
     "class TModelObject;\n"                              \
     "class %model%Object;\n"                             \
     "%7%"                                                \
-    "%classTable%"                                       \
     "\n\n"                                               \
     "class T_MODEL_EXPORT %model% : public TAbstractUser, public TAbstractModel\n" \
     "{\n"                                                \
@@ -227,7 +223,6 @@
     "#include <TreeFrogModel>\n"                              \
     "#include \"%inc%.h\"\n"                                  \
     "#include \"%inc%object.h\"\n"                            \
-    "%includeTable%"                                          \
     "\n"                                                      \
     "%model%::%model%()\n"                                    \
     "    : TAbstractUser(), TAbstractModel(), d(new %model%Object())\n" \
@@ -292,16 +287,16 @@
     "%10%"                                                    \
     "int %model%::count()\n"                                  \
     "{\n"                                                     \
-    "    %11%<%model%Object> mapper;\n"                       \
+    "    %13%<%model%Object> mapper;\n"                       \
     "    return mapper.findCount();\n"                        \
     "}\n"                                                     \
     "\n"                                                      \
     "QList<%model%> %model%::getAll()\n"                      \
     "{\n"                                                     \
-    "    return tfGetModelListBy%10%Criteria<%model%, %model%Object>();\n" \
+    "    return tfGetModelListBy%11%Criteria<%model%, %model%Object>();\n" \
     "}\n"                                                     \
-    "%12%"                                                    \
     "\n"                                                      \
+    "%12%"                                                    \
     "TModelObject *%model%::modelData()\n"                    \
     "{\n"                                                     \
     "    return d.data();\n"                                  \
@@ -382,15 +377,13 @@ ModelGenerator::ModelGenerator(ModelGenerator::ObjectType type, const QString &m
     : objectType(type), modelName(), tableName(table), userFields(userModelFields)
 {
     modelName = (!model.isEmpty()) ? fieldNameToEnumName(model) : fieldNameToEnumName(table);
-
     switch (type) {
-        case Sql:
-            objGen = new SqlObjGenerator(model, table);
-            break;
-
-        case Mongo:
-            objGen = new MongoObjGenerator(model);
-            break;
+    case Sql:
+        objGen = new SqlObjGenerator(model, table);
+        break;
+    case Mongo:
+        objGen = new MongoObjGenerator(model);
+        break;
     }
 }
 
@@ -407,11 +400,9 @@ bool ModelGenerator::generate(const QString &dstDir, bool userModel)
 
     // Generates model object class
     QString obj = objGen->generate(dstDir);
-
     if (obj.isEmpty()) {
         return false;
     }
-
     files << obj;
 
     // Generates user-model
@@ -433,21 +424,17 @@ bool ModelGenerator::generate(const QString &dstDir, bool userModel)
     bool ret = progen.add(files);
 
 #ifdef Q_OS_WIN
-
     if (ret) {
         // Deletes dummy models
         QStringList dummy = { "_dummymodel.h", "_dummymodel.cpp" };
         bool rmd = false;
-
         for (auto &f : dummy) {
             rmd |= ::remove(QDir(dstDir).filePath(f));
         }
-
         if (rmd) {
             progen.remove(dummy);
         }
     }
-
 #endif
 
     return ret;
@@ -471,8 +458,7 @@ QStringList ModelGenerator::genModel(const QString &dstDir)
 }
 
 
-QStringList ModelGenerator::genUserModel(const QString &dstDir, const QString &usernameField,
-        const QString &passwordField)
+QStringList ModelGenerator::genUserModel(const QString &dstDir, const QString &usernameField, const QString &passwordField)
 {
     QStringList ret;
     QDir dir(dstDir);
@@ -500,65 +486,53 @@ QStringList ModelGenerator::genUserModel(const QString &dstDir, const QString &u
 QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGenerator::createModelParams()
 {
     QString setgetDecl, setgetImpl, crtparams, getOptDecl, getOptImpl, initParams;
-    QStringList writableFieldList;
+    QList<QPair<QString, QString>> writableFields;
     bool optlockMethod = false;
-
-    QStringList fieldList = objGen->fieldList();
-    QStringList fieldTypeList = objGen->fieldTypeList();
-    QList<int> primaryKeyIndexList = objGen->primaryKeyIndexList();
+    FieldList fields = objGen->fieldList();
+    int pkidx = objGen->primaryKeyIndex();
     int autoIndex = objGen->autoValueIndex();
-    QString autoFieldName = (autoIndex >= 0) ? fieldList[autoIndex] : QString();
-    QStringList refTableList = objGen->refTableList();
-    QList<QStringList> refFieldList = objGen->refTableFieldList();
+    QString autoFieldName = (autoIndex >= 0) ? fields[autoIndex].first : QString();
     QString mapperstr = (objectType == Sql) ? "TSqlORMapper" : "TMongoODMapper";
 
-    for (int i = 0; i < fieldList.length(); ++i) {
-        QString field = fieldList[i];
-        QString type = fieldTypeList[i];
-        QString var = fieldNameToVariableName(field);
-        QString enu = fieldNameToEnumName(field);
-
-        if (type.isEmpty()) {
+    for (QListIterator<QPair<QString, QVariant::Type>> it(fields); it.hasNext(); ) {
+        const QPair<QString, QVariant::Type> &p = it.next();
+        QString var = fieldNameToVariableName(p.first);
+        QString type = QVariant::typeToName(p.second);
+        if (type.isEmpty())
             continue;
-        }
 
         // Getter method
         setgetDecl += QString("    %1 %2() const;\n").arg(type, var);
-        setgetImpl += QString("%1 %2::%3() const\n{\n    return d->%4;\n}\n\n").arg(type, modelName, var,
-                      field);
+        setgetImpl += QString("%1 %2::%3() const\n{\n    return d->%4;\n}\n\n").arg(type, modelName, var, p.first);
 
-        if (!excludedSetter.contains(field, Qt::CaseInsensitive) && field != autoFieldName) {
+        if (!excludedSetter.contains(p.first, Qt::CaseInsensitive) && p.first != autoFieldName) {
             // Setter method
-            setgetDecl += QString("    void set%1(%2);\n").arg(enu, createParam(type, field));
-            setgetImpl += QString("void %1::set%2(%3)\n{\n    d->%4 = %5;\n}\n\n").arg(modelName, enu,
-                          createParam(type, field), field, var);
+            QString str = fieldNameToEnumName(p.first);
+            setgetDecl += QString("    void set%1(%2);\n").arg(str, createParam(p.second, p.first));
+            setgetImpl += QString("void %1::set%2(%3)\n{\n    d->%4 = %5;\n}\n\n").arg(modelName, str, createParam(p.second, p.first), p.first, var);
 
             // Appends to crtparams-string
-            crtparams += createParam(type, field);
+            crtparams += createParam(p.second, p.first);
             crtparams += ", ";
 
-            writableFieldList << field;
+            writableFields << QPair<QString, QString>(p.first, type);
         }
 
         // Initial value in the default constructor
-        switch (QVariant::nameToType(type.toLatin1().data())) {
-            case QVariant::Int:
-            case QVariant::UInt:
-            case QVariant::LongLong:
-            case QVariant::ULongLong:
-            case QVariant::Double:
-                initParams += QString("\n    d->") + field + " = 0;";
-                break;
-
-            default:
-                ;
+        switch ((int)p.second) {
+        case QVariant::Int:
+        case QVariant::UInt:
+        case QVariant::LongLong:
+        case QVariant::ULongLong:
+        case QVariant::Double:
+            initParams += QString("\n    d->") + p.first + " = 0;";
+            break;
         }
 
         if (var == LOCK_REVISION_FIELD) {
             optlockMethod = true;
         }
     }
-
     crtparams.chop(2);
 
     if (crtparams.isEmpty()) {
@@ -569,70 +543,26 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
 
     // Creates parameters of get() method
     QString getparams;
-
-    if (primaryKeyIndexList.isEmpty()) {
+    if (pkidx < 0) {
         getparams = crtparams;
     } else {
-        for (int pkidx : primaryKeyIndexList) {
-            getparams += createParam(fieldTypeList[pkidx], fieldList[pkidx]);
-            getparams += ", ";
-        }
-
-        getparams.chop(2);
+        const QPair<QString, QVariant::Type> &pair = fields[pkidx];
+        getparams = createParam(pair.second, pair.first);
     }
 
     // Creates a declaration and a implementation of 'get' method for optimistic lock
-    if (!primaryKeyIndexList.isEmpty() && optlockMethod) {
-        getOptDecl = QString("    static %1 get(%2, int lockRevision);\n").arg(modelName, getparams);
-        QString criadd;
-
-        for (int pkidx : primaryKeyIndexList) {
-            criadd += QString("    cri.add(%1Object::%2, %3);\n").arg(modelName,
-                      fieldNameToEnumName(fieldList[pkidx]), fieldNameToVariableName(fieldList[pkidx]));
-        }
+    if (pkidx >= 0 && optlockMethod) {
+        const QPair<QString, QVariant::Type> &pair = fields[pkidx];
+        getOptDecl = QString("    static %1 get(%2, int lockRevision);\n").arg(modelName, createParam(pair.second, pair.first));
 
         getOptImpl = QString("%1 %1::get(%2, int lockRevision)\n"       \
                              "{\n"                                      \
-                             "    %3<%1Object> mapper;\n"               \
+                             "    %5<%1Object> mapper;\n"               \
                              "    TCriteria cri;\n"                     \
-                             "%4"                                       \
+                             "    cri.add(%1Object::%3, %4);\n"         \
                              "    cri.add(%1Object::LockRevision, lockRevision);\n" \
                              "    return %1(mapper.findFirst(cri));\n"  \
-                             "}\n\n").arg(modelName, getparams, mapperstr, criadd);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////
-    QString includeTable, classTable;
-    QStringList includeTableList;
-    includeTableList << fieldNameToEnumName(tableName);
-
-    for (int i = 0; i < refTableList.length(); ++i) {
-        QString enu = fieldNameToEnumName(refTableList[i]);
-        QString var = fieldNameToVariableName(refTableList[i]);
-
-        if (includeTableList.contains(enu)) {
-            continue;
-        } else {
-            includeTable += QString("#include \"%1.h\"\n").arg(enu.toLower());
-            classTable += QString("class %1;\n").arg(enu);
-
-            includeTableList << enu;
-
-            QString refFieldPara, refFieldName;
-
-            for (QString field : refFieldList[i]) {
-                refFieldName += fieldNameToVariableName(field);
-                refFieldPara += "d->";
-                refFieldPara += field;
-                refFieldPara += ", ";
-            }
-
-            refFieldPara.chop(2);
-
-            setgetDecl += QString("    %1 %2By%3() const;\n").arg(enu, var, refFieldName);
-            setgetImpl += QString("%1 %2::%3By%4() const\n{\n return %1::get(%5);\n}\n\n").arg(enu,
-                          modelName, var, refFieldName, refFieldPara);
-        }
+                             "}\n\n").arg(modelName, createParam(pair.second, pair.first), fieldNameToEnumName(pair.first), fieldNameToVariableName(pair.first), mapperstr);
     }
 
     PlaceholderList headerList, implList;
@@ -642,11 +572,9 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
                << pair("setgetDecl", setgetDecl)
                << pair("4", crtparams)
                << pair("5", getparams)
-               << pair("6", getOptDecl)
-               << pair("classTable", classTable);
+               << pair("6", getOptDecl);
 
     QString upsertDecl, upsertImpl;
-
     if (objectType == Mongo) {
         upsertDecl = "    bool upsert(const QVariantMap &criteria);\n";
         upsertImpl = QString("bool %1::upsert(const QVariantMap &criteria)\n" \
@@ -655,18 +583,18 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
                              "    return (obj) ? obj->upsert(criteria) : false;\n" \
                              "}\n\n").arg(modelName);
     }
-
-    headerList << pair("upsertDecl", "");
-    implList << pair("upsertImpl", "");
+    headerList << pair("upsertDecl", upsertDecl);
+    implList << pair("upsertImpl", upsertImpl);
 
     // Creates a model implementation
     QString createImpl;
     createImpl += QString("    %1Object obj;\n").arg(modelName);
 
-    for (QString field : writableFieldList) {
-        createImpl += QString("    obj.%1 = %2;\n").arg(field, fieldNameToVariableName(field));
+    QListIterator<QPair<QString, QString>> fi(writableFields);
+    while (fi.hasNext()) {
+        const QPair<QString, QString> &p = fi.next();
+        createImpl += QString("    obj.%1 = %2;\n").arg(p.first, fieldNameToVariableName(p.first));
     }
-
     createImpl += "    if (!obj.create()) {\n";
     createImpl += QString("        return %1();\n").arg(modelName);
     createImpl += "    }\n";
@@ -674,37 +602,25 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
 
     // Creates a implementation of get() method
     QString getImpl;
-
-    if (primaryKeyIndexList.isEmpty()) {
+    if (pkidx < 0) {
         // If no primary index exists
         getImpl += QString("    TCriteria cri;\n");
-
-        for (QString field : writableFieldList) {
-            getImpl += QString("    cri.add(%1Object::%2, %3);\n").arg(modelName, fieldNameToEnumName(field),
-                       fieldNameToVariableName(field));
+        fi.toFront();
+        while (fi.hasNext()) {
+            const QPair<QString, QString> &p = fi.next();
+            getImpl += QString("    cri.add(%1Object::%2, %3);\n").arg(modelName, fieldNameToEnumName(p.first), fieldNameToVariableName(p.first));
         }
     }
 
     getImpl += QString("    %1<%2Object> mapper;\n").arg(mapperstr, modelName);
     getImpl += QString("    return %1(mapper.").arg(modelName);
 
-    if (primaryKeyIndexList.isEmpty()) {
+    if (pkidx < 0) {
         getImpl += "findFirst(cri));\n";
     } else {
+        const QPair<QString, QVariant::Type> &pair = fields[pkidx];
         getImpl += (objectType == Sql) ? "findByPrimaryKey(" : "findByObjectId(";
-
-        if (primaryKeyIndexList.length() == 1) {
-            getImpl += fieldNameToVariableName(fieldList.at(primaryKeyIndexList.at(0)));
-        } else {
-            getImpl += "QVariantList()";
-
-            for (int pkidx : primaryKeyIndexList) {
-                getImpl += "<<QVariant(";
-                getImpl += fieldNameToVariableName(fieldList.at(pkidx));
-                getImpl += ")";
-            }
-        }
-
+        getImpl += fieldNameToVariableName(pair.first);
         getImpl += QString("));\n");
     }
 
@@ -717,28 +633,23 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
              << pair("7", getparams)
              << pair("8", getImpl)
              << pair("10", getOptImpl)
-             << pair("11", ((objectType == Mongo) ? "Mongo" : ""))
-             << pair("includeTable", includeTable);
+             << pair("11", ((objectType == Mongo) ? "Mongo" : ""));
 
-    //headerList << pair("7", "class QJsonArray;\n")
-    //           << pair("8", "    static QJsonArray getAllJson();\n");
-    headerList << pair("7", "")
-               << pair("8", "");
+    headerList << pair("7", "class QJsonArray;\n")
+               << pair("8", "    static QJsonArray getAllJson();\n");
 
     switch (objectType) {
-        case Sql:
-            //implList << pair("12", replaceholder(MODEL_IMPL_GETALLJSON, pair("model", modelName)));
-            implList << pair("12", "");
-            break;
+    case Sql:
+        implList << pair("12", replaceholder(MODEL_IMPL_GETALLJSON, pair("model", modelName)));
+        break;
 
-        case Mongo:
-            //implList << pair("12", replaceholder(MODEL_IMPL_GETALLJSON_MONGO, pair("model", modelName)));
-            implList << pair("12", "");
-            break;
+    case Mongo:
+        implList << pair("12", replaceholder(MODEL_IMPL_GETALLJSON_MONGO, pair("model", modelName)));
+        break;
 
-        default:
-            implList << pair("12", "");
-            break;
+    default:
+        implList << pair("12", "");
+        break;
     }
 
     implList <<  pair("13", mapperstr);
@@ -749,7 +660,6 @@ QPair<ModelGenerator::PlaceholderList, ModelGenerator::PlaceholderList> ModelGen
 QString ModelGenerator::replaceholder(const QString &format, const QPair<QString, QString> &value)
 {
     QString out = format;
-
     QString placeholder = QLatin1Char('%') + value.first + QLatin1Char('%');
     out.replace(placeholder, value.second);
     return out;
@@ -759,11 +669,9 @@ QString ModelGenerator::replaceholder(const QString &format, const QPair<QString
 QString ModelGenerator::replaceholder(const QString &format, const PlaceholderList &values)
 {
     QString out = format;
-
     for (auto &p : values) {
         out = replaceholder(out, p);
     }
-
     return out;
 }
 
@@ -776,60 +684,32 @@ void ModelGenerator::gen(const QString &fileName, const QString &format, const Q
 }
 
 
-QString ModelGenerator::createParam(const QString &type, const QString &name)
+QString ModelGenerator::createParam(QVariant::Type type, const QString &name)
 {
     QString string;
     QString var = fieldNameToVariableName(name);
-    QVariant::Type vtype = QVariant::nameToType(type.toLatin1().data());
-
-    if (vtype == QVariant::Int || vtype == QVariant::UInt || vtype == QVariant::ULongLong || vtype == QVariant::Double || vtype == QVariant::Bool) {
-        string += type;
+    if (type == QVariant::Int || type == QVariant::UInt || type == QVariant::ULongLong || type == QVariant::Double) {
+        string += QVariant::typeToName(type);
         string += ' ';
         string += var;
     } else {
-        string += QString("const %1 &%2").arg(type, var);
+        string += QString("const %1 &%2").arg(QVariant::typeToName(type), var);
     }
-
     return string;
 }
 
 
-QStringList ModelGenerator::fieldList() const
+ModelGenerator::FieldList ModelGenerator::fieldList() const
 {
     return objGen->fieldList();
 }
 
 
-QStringList ModelGenerator::fieldTypeList() const
+int ModelGenerator::primaryKeyIndex() const
 {
-    return objGen->fieldTypeList();
+    return objGen->primaryKeyIndex();
 }
 
-
-QList<int> ModelGenerator::primaryKeyIndexList() const
-{
-    return objGen->primaryKeyIndexList();
-}
-
-QStringList ModelGenerator::refTableList() const
-{
-    return objGen->refTableList();
-}
-
-QList<QStringList> ModelGenerator::refTableFieldList() const
-{
-    return objGen->refTableFieldList();
-}
-
-QStringList ModelGenerator::reffedTableList() const
-{
-    return objGen->reffedTableList();
-}
-
-QList<QStringList> ModelGenerator::reffedTableFieldList() const
-{
-    return objGen->reffedTableFieldList();
-}
 
 int ModelGenerator::autoValueIndex() const
 {

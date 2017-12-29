@@ -9,6 +9,7 @@
 #include <TMultipartFormData>
 #include <THttpUtility>
 #include <TAppSettings>
+#include <QBuffer>
 #include "tsystemglobal.h"
 #if QT_VERSION >= 0x050000
 #include <QJsonDocument>
@@ -52,6 +53,7 @@ static bool httpMethodOverride()
 THttpRequestData::THttpRequestData(const THttpRequestData &other)
     : QSharedData(other),
       header(other.header),
+      bodyArray(other.bodyArray),
       queryItems(other.queryItems),
       formItems(other.formItems),
       multipartFormData(other.multipartFormData),
@@ -89,6 +91,7 @@ THttpRequest::THttpRequest(const THttpRequestHeader &header, const QByteArray &b
     : d(new THttpRequestData)
 {
     d->header = header;
+    d->bodyArray = body;
     d->clientAddress = clientAddress;
     parseBody(body, header);
 }
@@ -110,13 +113,24 @@ THttpRequest::THttpRequest(const QByteArray &header, const QString &filePath, co
   Destructor.
 */
 THttpRequest::~THttpRequest()
-{ }
+{
+    if (bodyDevide) {
+        bodyDevide->close();
+        delete bodyDevide;
+    }
+}
 
 /*!
   Assignment operator.
 */
 THttpRequest &THttpRequest::operator=(const THttpRequest &other)
 {
+    if (bodyDevide) {
+        bodyDevide->close();
+        delete bodyDevide;
+        bodyDevide = nullptr;
+    }
+
     d = other.d;
     return *this;
 }
@@ -264,10 +278,43 @@ QStringList THttpRequest::allItemValues(const QString &name, const QList<QPair<Q
 /*!
   Returns the list of query string values whose name is equal to \a name from
   the URL.
+  \see QStringList queryItemList()
  */
 QStringList THttpRequest::allQueryItemValues(const QString &name) const
 {
     return allItemValues(name, d->queryItems);
+}
+
+/*!
+  Returns the list of query string value whose key is equal to \a key, such as
+  "foo[]", from the URL.
+  \see QStringList THttpRequest::allQueryItemValues()
+ */
+QStringList THttpRequest::queryItemList(const QString &key) const
+{
+    QString k = key;
+    if (!k.endsWith("[]")) {
+        k += QLatin1String("[]");
+    }
+    return allQueryItemValues(k);
+}
+
+/*!
+  Returns the list of query value whose key is equal to \a key, such as
+  "foo[]", from the URL.
+ */
+QVariantList THttpRequest::queryItemVariantList(const QString &key) const
+{
+    return itemVariantList(key, d->queryItems);
+}
+
+/*!
+  Returns the map of query value whose key is equal to \a key from
+  the URL.
+ */
+QVariantMap THttpRequest::queryItems(const QString &key) const
+{
+    return itemMap(key, d->queryItems);
 }
 
 
@@ -327,6 +374,7 @@ QString THttpRequest::formItemValue(const QString &name, const QString &defaultV
 /*!
   Returns the list of string value whose name is equal to \a name from the
   form data.
+  \see QStringList formItemList()
  */
 QStringList THttpRequest::allFormItemValues(const QString &name) const
 {
@@ -336,6 +384,7 @@ QStringList THttpRequest::allFormItemValues(const QString &name) const
 /*!
   Returns the list of string value whose key is equal to \a key, such as
   "foo[]", from the form data.
+  \see QStringList allFormItemValues()
  */
 QStringList THttpRequest::formItemList(const QString &key) const
 {
@@ -472,7 +521,7 @@ void THttpRequest::parseBody(const QByteArray &body, const THttpRequestHeader &h
 
     case Tf::Get: {
         // query parameter
-        QList<QByteArray> data = d->header.path().split('?');
+        QList<QByteArray> data = header.path().split('?');
         QString getdata = data.value(1);
         if (!getdata.isEmpty()) {
             const QStringList pairs = getdata.split('&', QString::SkipEmptyParts);
@@ -567,6 +616,19 @@ QList<THttpRequest> THttpRequest::generate(const QByteArray &byteArray, const QH
     }
 
     return reqList;
+}
+
+
+QIODevice *THttpRequest::rawBody()
+{
+    if (! bodyDevide) {
+        if (! d->multipartFormData.bodyFile.isEmpty()) {
+            bodyDevide = new QFile(d->multipartFormData.bodyFile);
+        } else {
+            bodyDevide = new QBuffer(&d->bodyArray);
+        }
+    }
+    return bodyDevide;
 }
 
 

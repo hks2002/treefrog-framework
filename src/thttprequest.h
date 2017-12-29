@@ -16,6 +16,8 @@
 #include <QJsonDocument>
 #endif
 
+class QIODevice;
+
 
 class T_CORE_EXPORT THttpRequestData : public QSharedData
 {
@@ -25,6 +27,7 @@ public:
     ~THttpRequestData() { }
 
     THttpRequestHeader header;
+    QByteArray bodyArray;
     QList<QPair<QString, QString>> queryItems;
     QList<QPair<QString, QString>> formItems;
     TMultipartFormData multipartFormData;
@@ -58,6 +61,9 @@ public:
     QString queryItemValue(const QString &name) const;
     QString queryItemValue(const QString &name, const QString &defaultValue) const;
     QStringList allQueryItemValues(const QString &name) const;
+    QStringList queryItemList(const QString &key) const;
+    QVariantList queryItemVariantList(const QString &key) const;
+    QVariantMap queryItems(const QString &key) const;
     QVariantMap queryItems() const;
     bool hasForm() const { return !d->formItems.isEmpty(); }
     bool hasFormItem(const QString &name) const;
@@ -72,6 +78,7 @@ public:
     QByteArray cookie(const QString &name) const;
     QList<TCookie> cookies() const;
     QHostAddress clientAddress() const { return d->clientAddress; }
+    QIODevice *rawBody();
 
 #if QT_VERSION >= 0x050000
     bool hasJson() const { return !d->jsonData.isNull(); }
@@ -94,6 +101,7 @@ private:
     void parseBody(const QByteArray &body, const THttpRequestHeader &header);
 
     QSharedDataPointer<THttpRequestData> d;
+    QIODevice *bodyDevide {nullptr};
     friend class TMultipartFormData;
 };
 

@@ -3,7 +3,6 @@
 
 #include <QString>
 #include <QDir>
-#include <TAbstractModel>
 
 extern QString fieldNameToVariableName(const QString &name);
 extern QString fieldNameToEnumName(const QString &name);

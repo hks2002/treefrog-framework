@@ -11,12 +11,11 @@
 #include "filewriter.h"
 #include "util.h"
 
-
 #define INDEX_HTML_TEMPLATE                                             \
     "<!DOCTYPE html>\n"                                                 \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=UTF-8\" />\n"                                      \
+    "  <meta charset=\"UTF-8\">\n"                                      \
     "  <title data-tf=\"@head_title\"></title>\n"                       \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -57,17 +56,17 @@
     "%4"                                                                \
     "@link_to_entry :== linkTo(\"Create a new %6\", urla(\"create\"))\n" \
     "\n"                                                                \
-    "@link_to_show :== linkTo(\"Show\", urla(\"show\", %5))\n"          \
+    "@link_to_show :== linkTo(\"Show\", urla(\"show\", i.%5()))\n"      \
     "\n"                                                                \
-    "@link_to_edit :== linkTo(\"Edit\", urla(\"save\", %5))\n"      \
+    "@link_to_edit :== linkTo(\"Edit\", urla(\"save\", i.%5()))\n"      \
     "\n"                                                                \
-    "@link_to_remove :== linkTo(\"Remove\", urla(\"remove\", %5), Tf::Post, \"confirm('Are you sure?')\")\n"
+    "@link_to_remove :== linkTo(\"Remove\", urla(\"remove\", i.%5()), Tf::Post, \"confirm('Are you sure?')\")\n"
 
 #define SHOW_HTML_TEMPLATE                                              \
     "<!DOCTYPE html>\n"                                                 \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=UTF-8\" />\n"                                      \
+    "  <meta charset=\"UTF-8\">\n"                                      \
     "  <title data-tf=\"@head_title\"></title>\n"                       \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -96,7 +95,7 @@
     "@notice_msg ~=$ notice\n"                                          \
     "\n"                                                                \
     "%4"                                                                \
-    "@link_to_edit :== linkTo(\"Edit\", urla(\"save\", %5))\n"     \
+    "@link_to_edit :== linkTo(\"Edit\", urla(\"save\", %3.%5()))\n"     \
     "\n"                                                                \
     "@link_to_index :== linkTo(\"Back\", urla(\"index\"))\n"
 
@@ -104,7 +103,7 @@
     "<!DOCTYPE html>\n"                                                 \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=UTF-8\" />\n"                                      \
+    "  <meta charset=\"UTF-8\">\n"                                      \
     "  <title data-tf=\"@head_title\"></title>\n"                       \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -146,7 +145,7 @@
     "<!DOCTYPE html>\n"                                                 \
     "<html>\n"                                                          \
     "<head>\n"                                                          \
-    "  <meta charset=UTF-8\" />\n"                                      \
+    "  <meta charset=\"UTF-8\">\n"                                      \
     "  <title data-tf=\"@head_title\"></title>\n"                       \
     "</head>\n"                                                         \
     "<body>\n"                                                          \
@@ -180,10 +179,10 @@
     "\n"                                                                \
     "@notice_msg ~=$ notice\n"                                          \
     "\n"                                                                \
-    "@edit_form |== formTag(urla(\"save\", %3))\n"                      \
+    "@edit_form |== formTag(urla(\"save\", %2[\"%3\"]))\n"              \
     "\n"                                                                \
-    "%4"                                                                \
-    "@link_to_show |== linkTo(\"Show\", urla(\"show\", %3))\n"          \
+    "%5"                                                                \
+    "@link_to_show |== linkTo(\"Show\", urla(\"show\", %2[\"%3\"]))\n"  \
     "\n"                                                                \
     "@link_to_index |== linkTo(\"Back\", urla(\"index\"))\n"
 
@@ -197,12 +196,6 @@ static const QStringList excludedColumn = {
     "updatedAt",
     "modifiedAt",
     "lockRevision",
-    "created_by",
-    "updated_by",
-    "modified_by",
-    "createdBy",
-    "updatedBy",
-    "modifiedBy",
 };
 
 
@@ -215,12 +208,8 @@ static const QStringList excludedDirName = {
 };
 
 
-OtamaGenerator::OtamaGenerator(const ModelGenerator &modelGen)
-    : viewName(modelGen.model()),
-      fieldList(modelGen.fieldList()),
-      fieldTypeList(modelGen.fieldTypeList()),
-      primaryKeyIndexList(modelGen.primaryKeyIndexList()),
-      autoValueIndex(modelGen.autoValueIndex())
+OtamaGenerator::OtamaGenerator(const QString &view, const QList<QPair<QString, QVariant::Type>> &fields, int pkIdx, int autoValIdx)
+    : viewName(view), fieldList(fields), primaryKeyIndex(pkIdx), autoValueIndex(autoValIdx)
 { }
 
 
@@ -230,8 +219,7 @@ bool OtamaGenerator::generate(const QString &dstDir) const
 
     // Reserved word check
     if (excludedDirName.contains(dir.dirName())) {
-        qCritical("Reserved word error. Please use another word.  View name: %s",
-                  qPrintable(dir.dirName()));
+        qCritical("Reserved word error. Please use another word.  View name: %s", qPrintable(dir.dirName()));
         return false;
     }
 
@@ -248,7 +236,7 @@ QStringList OtamaGenerator::generateViews(const QString &dstDir) const
 {
     QStringList files;
 
-    if (primaryKeyIndexList.isEmpty()) {
+    if (primaryKeyIndex < 0) {
         qWarning("Primary key not found. [view name: %s]", qPrintable(viewName));
         return files;
     }
@@ -257,82 +245,54 @@ QStringList OtamaGenerator::generateViews(const QString &dstDir) const
     FileWriter fw;
     QString output;
     QString caption = enumNameToCaption(viewName);
-    QString modelName = enumNameToVariableName(viewName);
+    QString varName = enumNameToVariableName(viewName);
+    const QPair<QString, QVariant::Type> &pkFld = fieldList[primaryKeyIndex];
 
-    QString indexUrl = "QStringList()";
-    QString showUrl  = "QStringList()";
-    QString saveUrl  = "QStringList()";
-
-    for (int pkidx : primaryKeyIndexList) {
-        QString enu = fieldNameToEnumName(fieldList[pkidx]);
-        QString var = fieldNameToVariableName(fieldList[pkidx]);
-        QString type = fieldTypeList[pkidx];
-        QVariant::Type vtype = QVariant::nameToType(type.toLatin1().data());
-
-        if (vtype == QVariant::Int || vtype == QVariant::UInt || vtype == QVariant::ULongLong ||
-            vtype == QVariant::Double) {
-            indexUrl += QString("<<QString::number(i.get%1())").arg(enu);
-            showUrl  += QString("<<QString::number(%1.get%2())").arg(modelName, enu);
-        }
-        else if (vtype == QVariant::String) {
-            indexUrl += QString("<<i.get%1()").arg(enu);
-            showUrl  += QString("<<%1.get%2()").arg(modelName, enu);
-        }
-        else {}
-
-        saveUrl  += QString("<<%1[\"%2\"].toString()").arg(modelName, var);
-    }
-
-    QString th, td, indexOtm, showColumn, showOtm, entryColumn, editColumn, entryOtm, editOtm;
-
+    // Generates index.html
+    QString th ,td, indexOtm, showColumn, showOtm, entryColumn, editColumn, entryOtm, editOtm;
     for (int i = 0; i < fieldList.count(); ++i) {
-        QString cap = fieldNameToCaption(fieldList[i]);
-        QString enu = fieldNameToEnumName(fieldList[i]);
-        QString var = fieldNameToVariableName(fieldList[i]);
-        QString mrk = fieldList[i].toLower();
+        const QPair<QString, QVariant::Type> &p = fieldList[i];
+        QString cap = fieldNameToCaption(p.first);
+        QString var = fieldNameToVariableName(p.first);
+        QString mrk = p.first.toLower();
         QString readonly;
 
         if (!excludedColumn.contains(var, Qt::CaseInsensitive)) {
-            th += "    <th>" + cap + "</th>\n";
-            td += "    <td data-tf=\"@" + mrk + "\"></td>\n";
+            th += "    <th>";
+            th += cap;
+            th += "</th>\n";
 
-            indexOtm += QString("@%1 ~= i.get%2()\n\n").arg(mrk, enu);
+            td += "    <td data-tf=\"@";
+            td += mrk;
+            td += "\"></td>\n";
+
+            indexOtm += QString("@%1 ~= i.%2()\n\n").arg(mrk, var);
 
             if (i != autoValueIndex) {  // case of not auto-value field
-                entryColumn += QString("  <p>\n    <label>%1<br /><input data-tf=\"@%2\" /></label>\n  </p>\n").arg(
-                                   cap, mrk);
-                entryOtm += QString("@%1 |== inputTextTag(\"%2[%3]\", %2[\"%3\"].toString())\n\n").arg(mrk,
-                            modelName, enu);
+                entryColumn += QString("  <p>\n    <label>%1<br /><input data-tf=\"@%2\" /></label>\n  </p>\n").arg(cap, mrk);
+                entryOtm += QString("@%1 |== inputTextTag(\"%2[%3]\", %2[\"%3\"].toString())\n\n").arg(mrk, varName, var);
             }
 
-            editColumn += QString("  <p>\n    <label>%1<br /><input data-tf=\"@%2\" /></label>\n  </p>\n").arg(
-                              cap, mrk);
-
-            if (primaryKeyIndexList.contains(i)) {
+            editColumn += QString("  <p>\n    <label>%1<br /><input data-tf=\"@%2\" /></label>\n  </p>\n").arg(cap, mrk);
+            if  (p.first == pkFld.first) {
                 readonly = QLatin1String(", a(\"readonly\", \"readonly\")");
             }
-
-            editOtm += QString("@%1 |== inputTextTag(\"%2[%3]\", %2[\"%3\"].toString()%4);\n\n").arg(mrk,
-                       modelName, var, readonly);
+            editOtm += QString("@%1 |== inputTextTag(\"%2[%3]\", %2[\"%3\"].toString()%4);\n\n").arg(mrk, varName, var, readonly);
         }
-
         showColumn += QString("<dt>%1</dt><dd data-tf=\"@%2\">(%3)</dd><br />\n").arg(cap, mrk, var);
-        showOtm += QString("@%1 ~= %2.get%3()\n\n").arg(mrk, modelName, enu);
+        showOtm += QString("@%1 ~= %2.%3()\n\n").arg(mrk, varName, var);
     }
 
-    // Generates index.html
     output = QString(INDEX_HTML_TEMPLATE).arg(caption, th, td);
     fw.setFilePath(dir.filePath("index.html"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
 
     // Generates index.otm
-    output = QString(INDEX_OTM_TEMPLATE).arg(modelName.toLower(), viewName, modelName, indexOtm,
-             indexUrl, caption);
+    QString pkVarName = fieldNameToVariableName(pkFld.first);
+    output = QString(INDEX_OTM_TEMPLATE).arg(varName.toLower(), viewName, varName, indexOtm, pkVarName, caption);
     fw.setFilePath(dir.filePath("index.otm"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
@@ -340,15 +300,13 @@ QStringList OtamaGenerator::generateViews(const QString &dstDir) const
     // Generates show.html
     output = QString(SHOW_HTML_TEMPLATE).arg(caption, showColumn);
     fw.setFilePath(dir.filePath("show.html"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
 
     // Generates show.otm
-    output = QString(SHOW_OTM_TEMPLATE).arg(modelName.toLower(), viewName, modelName, showOtm, showUrl);
+    output = QString(SHOW_OTM_TEMPLATE).arg(varName.toLower(), viewName, varName, showOtm, pkVarName);
     fw.setFilePath(dir.filePath("show.otm"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
@@ -356,15 +314,13 @@ QStringList OtamaGenerator::generateViews(const QString &dstDir) const
     // Generates entry.html
     output = QString(CREATE_HTML_TEMPLATE).arg(caption, entryColumn);
     fw.setFilePath(dir.filePath("create.html"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
 
     // Generates entry.otm
-    output = QString(CREATE_OTM_TEMPLATE).arg(modelName.toLower(), modelName, entryOtm);
+    output = QString(CREATE_OTM_TEMPLATE).arg(varName.toLower(), varName, entryOtm);
     fw.setFilePath(dir.filePath("create.otm"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
@@ -372,15 +328,13 @@ QStringList OtamaGenerator::generateViews(const QString &dstDir) const
     // Generates edit.html
     output = QString(SAVE_HTML_TEMPLATE).arg(caption, editColumn);
     fw.setFilePath(dir.filePath("save.html"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }
 
     // Generates edit.otm
-    output = QString(SAVE_OTM_TEMPLATE).arg(modelName.toLower(), modelName, saveUrl, editOtm);
+    output = QString(SAVE_OTM_TEMPLATE).arg(varName.toLower(), varName, pkVarName, editOtm);
     fw.setFilePath(dir.filePath("save.otm"));
-
     if (fw.write(output, false)) {
         files << fw.fileName();
     }

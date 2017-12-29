@@ -8,6 +8,7 @@
 #include <QSet>
 #include <QRegExp>
 #include <QStringList>
+#include <tabstractmodel.h>
 #include "global.h"
 
 class UpperWords : public QSet<QString>
