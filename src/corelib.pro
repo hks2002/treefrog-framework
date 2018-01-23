@@ -2,7 +2,7 @@ TARGET   = treefrog
 TEMPLATE = lib
 CONFIG  += shared console c++11
 CONFIG  -= lib_bundle
-QT      += sql network xml
+QT      += sql network xml qml
 DEFINES += TF_MAKEDLL
 INCLUDEPATH += ../include
 DEPENDPATH  += ../include
@@ -52,11 +52,6 @@ windows {
   test.files = $$TEST_FILES $$TEST_CLASSES
   test.path = $$header.path/TfTest
   INSTALLS += header test
-
-  # c++11
-  lessThan(QT_MAJOR_VERSION, 5) {
-    QMAKE_CXXFLAGS += -std=c++0x
-  }
 }
 
 !CONFIG(debug, debug|release) {
@@ -294,6 +289,18 @@ HEADERS += tbackgroundprocesshandler.h
 SOURCES += tbackgroundprocesshandler.cpp
 HEADERS += tdebug.h
 SOURCES += tdebug.cpp
+HEADERS += tjsonutil.h
+SOURCES += tjsonutil.cpp
+HEADERS += tjsloader.h
+SOURCES += tjsloader.cpp
+HEADERS += tjsmodule.h
+SOURCES += tjsmodule.cpp
+HEADERS += tjsinstance.h
+SOURCES += tjsinstance.cpp
+HEADERS += treactcomponent.h
+SOURCES += treactcomponent.cpp
+
+SOURCES += tactioncontroller_qt5.cpp
 
 HEADERS += \
            tfnamespace.h \
@@ -347,29 +354,10 @@ freebsd {
   LIBS += -lutil -lprocstat
 }
 
-# Qt5
-greaterThan(QT_MAJOR_VERSION, 4) {
-  QT      += qml
-  HEADERS += tjsonutil.h
-  SOURCES += tjsonutil.cpp
-  HEADERS += tjsloader.h
-  SOURCES += tjsloader.cpp
-  HEADERS += tjsmodule.h
-  SOURCES += tjsmodule.cpp
-  HEADERS += tjsinstance.h
-  SOURCES += tjsinstance.cpp
-  HEADERS += treactcomponent.h
-  SOURCES += treactcomponent.cpp
-
-  SOURCES += tactioncontroller_qt5.cpp
-}
-
 
 # Files for MongoDB
 INCLUDEPATH += ../3rdparty/mongo-c-driver/src/mongoc ../3rdparty/mongo-c-driver/src/libbson/src/bson
 windows {
-#  DEFINES += MONGO_STATIC_BUILD
-
   win32-msvc* {
     CONFIG(debug, debug|release) {
       LIBS += ..\3rdparty\mongo-c-driver\debug\mongoc.lib
@@ -386,7 +374,6 @@ windows {
 } else {
   LIBS += ../3rdparty/mongo-c-driver/libmongoc.a
 }
-#DEFINES += MONGO_HAVE_STDINT
 
 HEADERS += tmongodriver.h
 SOURCES += tmongodriver.cpp

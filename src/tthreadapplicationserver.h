@@ -22,11 +22,7 @@ public:
     bool isAutoReloadingEnabled() override;
 
 protected:
-#if QT_VERSION >= 0x050000
     void incomingConnection(qintptr socketDescriptor) override;
-#else
-    void incomingConnection(int socketDescriptor) override;
-#endif
     void timerEvent(QTimerEvent *event) override;
 
 private:
@@ -69,6 +65,7 @@ public:
     {
         TStaticReleaseThread *releaser = new TStaticReleaseThread();
         releaser->start();
+        QThread::yieldCurrentThread();
         releaser->wait();
         delete releaser;
     }

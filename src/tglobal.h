@@ -1,9 +1,9 @@
 #ifndef TGLOBAL_H
 #define TGLOBAL_H
 
-#define TF_VERSION_STR "1.20.0"
-#define TF_VERSION_NUMBER 0x012000
-#define TF_SRC_REVISION 1612
+#define TF_VERSION_STR "1.21.0"
+#define TF_VERSION_NUMBER 0x012100
+#define TF_SRC_REVISION 1618
 
 #include <QtGlobal>
 #include <QMetaType>
@@ -150,15 +150,6 @@
 #define tInfo  TDebug(Tf::InfoLevel).info
 #define tDebug TDebug(Tf::DebugLevel).debug
 #define tTrace TDebug(Tf::TraceLevel).trace
-
-#if QT_VERSION < 0x050000
-#  define TF_SET_CODEC_FOR_TR(codec)  do { QTextCodec::setCodecForTr(codec); QTextCodec::setCodecForCStrings(codec); } while (0)
-#  ifndef   Q_DECL_OVERRIDE
-#    define Q_DECL_OVERRIDE
-#  endif
-#else
-#  define TF_SET_CODEC_FOR_TR(codec)
-#endif
 
 
 #include <TfNamespace>
