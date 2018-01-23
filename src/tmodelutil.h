@@ -13,12 +13,13 @@ template <class T, class S>
 inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, const QList<QPair<QString, Tf::SortOrder>> &sortColumns, int limit = 0, int offset = 0)
 {
     TSqlORMapper<S> mapper;
-    for (auto &p : sortColumns) {
-		if (!p.first.isEmpty()) {
-			mapper.setSortOrder(p.first, p.second);
-		}
+    if (! sortColumns.isEmpty()) {
+        for (auto &p : sortColumns) {
+            if (!p.first.isEmpty()) {
+                mapper.setSortOrder(p.first, p.second);
+            }
+        }
     }
-
     if (limit > 0) {
         mapper.setLimit(limit);
     }
@@ -45,7 +46,7 @@ inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, const QList<QPair
             sorts << qMakePair(columnName, p.second);
         }
     }
-    return list;
+    return tfGetModelListByCriteria<T, S>(cri, sorts, limit, offset);
 }
 
 template <class T, class S>
@@ -65,7 +66,7 @@ inline QList<T> tfGetModelListByCriteria(const TCriteria &cri, QString sortColum
 template <class T, class S>
 inline QList<T> tfGetModelListByCriteria(const TCriteria &cri = TCriteria(), int limit = 0, int offset = 0)
 {
-    QList<QPair<int, Tf::SortOrder>> sortColumns;
+    QList<QPair<int, Tf::SortOrder>> sortColumns = { qMakePair(-1, Tf::AscendingOrder) };
     return tfGetModelListByCriteria<T, S>(cri, sortColumns, limit, offset);
 }
 
